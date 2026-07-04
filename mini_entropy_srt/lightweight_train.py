@@ -9,23 +9,32 @@ per-rollout entropy (surprisal) bonus.
 \\boxed{} extraction and ground-truth matching reuse repo_utils (the actual SRT repo's
 math_verify-based equivalence checker) -- same as baselines.py/entropy_reward.py -- so
 answers like \\boxed{0.5} and \\boxed{1/2} are correctly treated as equal, matching every
-other Day 1/2 script. This means the import only resolves when run as a module (see
-Usage below), not as a bare script.
+other Day 1/2 script.
 
-Usage:
-    python -m mini_entropy_srt.lightweight_train --alpha 0.0 --n_steps 20 --n_rollouts 4   # smoke test
-    python -m mini_entropy_srt.lightweight_train --alpha 0.3 --n_steps 500 --n_rollouts 8  # real run
+Usage (both work -- see the sys.path bootstrap below for why):
+    python -m mini_entropy_srt.lightweight_train --alpha 0.0 --n_steps 20 --n_rollouts 4   # from RL_Project/
+    python lightweight_train.py --alpha 0.0 --n_steps 20 --n_rollouts 4                    # from mini_entropy_srt/
 """
 
 import argparse
 import json
 import math
+import sys
 from collections import Counter
 from pathlib import Path
 
 import pandas as pd
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
+# Makes `from mini_entropy_srt import repo_utils` resolve even when this file is run
+# as a bare script from inside mini_entropy_srt/ itself (python lightweight_train.py),
+# not just via `python -m mini_entropy_srt.lightweight_train` from the parent dir --
+# in the bare-script case, Python only puts this file's OWN directory on sys.path,
+# so the package containing it isn't otherwise importable.
+_PARENT_DIR = Path(__file__).resolve().parent.parent
+if str(_PARENT_DIR) not in sys.path:
+    sys.path.insert(0, str(_PARENT_DIR))
 
 from mini_entropy_srt import repo_utils
 
