@@ -330,10 +330,12 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         args.model_path, torch_dtype=torch.float16
     ).to("cuda")
+    model.gradient_checkpointing_enable()  # trade compute for memory
     tokenizer = AutoTokenizer.from_pretrained(args.model_path)
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    # SGD needs ~1x extra memory for its state vs AdamW's ~2x -- important on an 11GB GPU
+    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
 
     print("Loading data...")
     train_df = pd.read_parquet(args.train_parquet)
