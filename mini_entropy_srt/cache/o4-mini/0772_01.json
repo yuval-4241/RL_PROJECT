@@ -1,0 +1,49 @@
+{
+  "model": "o4-mini",
+  "prompt_idx": 772,
+  "rollout_idx": 1,
+  "content": "First, observe that if \\(n\\) has any digit 0 then the left\u2010hand side (the product of its digits) is 0, while the right\u2010hand side\n\\[\nn^2-15n-27\n\\]\nfor positive \\(n\\) never vanishes at an integer.  Hence none of the digits of \\(n\\) can be 0.\n\nNext, for a \\(k\\)\u2013digit number \\(n\\), the product of its digits is at most \\(9^k\\), whereas\n\\[\nn^2-15n-27\\sim n^2\n\\]\ngrows quadratically.  One checks that once \\(n\\ge37\\), \n\\[\nn^2-15n-27>9^2=81\\ge9^k,\n\\]\nso no solutions can occur for \\(n\\ge37\\).  Thus we need only check\n\\[\n17\\le n\\le36\n\\]\n(because for \\(n<17\\), \\(n^2-15n-27\\) is negative and the digit\u2010product is nonnegative).\n\nA quick direct check of the two\u2010digit \\(n\\) from 17 up to 36 shows that the only one satisfying\n\\[\n\\text{(product of digits of }n)=n^2-15n-27\n\\]\nis\n\\[\nn=17,\\quad 1\\cdot7=7,\\quad 17^2-15\\cdot17-27=289-255-27=7.\n\\]\nNo other \\(n\\) in the range works.  Hence the only positive solution is \\(n=17\\), and so the sum of all such \\(n\\) is\n\n\\boxed{17}",
+  "raw": {
+    "id": "chatcmpl-DxfiWpRgNwRj9yKutpkqsNNmSjqfU",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "First, observe that if \\(n\\) has any digit 0 then the left\u2010hand side (the product of its digits) is 0, while the right\u2010hand side\n\\[\nn^2-15n-27\n\\]\nfor positive \\(n\\) never vanishes at an integer.  Hence none of the digits of \\(n\\) can be 0.\n\nNext, for a \\(k\\)\u2013digit number \\(n\\), the product of its digits is at most \\(9^k\\), whereas\n\\[\nn^2-15n-27\\sim n^2\n\\]\ngrows quadratically.  One checks that once \\(n\\ge37\\), \n\\[\nn^2-15n-27>9^2=81\\ge9^k,\n\\]\nso no solutions can occur for \\(n\\ge37\\).  Thus we need only check\n\\[\n17\\le n\\le36\n\\]\n(because for \\(n<17\\), \\(n^2-15n-27\\) is negative and the digit\u2010product is nonnegative).\n\nA quick direct check of the two\u2010digit \\(n\\) from 17 up to 36 shows that the only one satisfying\n\\[\n\\text{(product of digits of }n)=n^2-15n-27\n\\]\nis\n\\[\nn=17,\\quad 1\\cdot7=7,\\quad 17^2-15\\cdot17-27=289-255-27=7.\n\\]\nNo other \\(n\\) in the range works.  Hence the only positive solution is \\(n=17\\), and so the sum of all such \\(n\\) is\n\n\\boxed{17}",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": [],
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1783114084,
+    "model": "o4-mini-2025-04-16",
+    "object": "chat.completion",
+    "moderation": null,
+    "service_tier": "default",
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 3011,
+      "prompt_tokens": 51,
+      "total_tokens": 3062,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 2624,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    }
+  },
+  "max_completion_tokens_used": 8192,
+  "escalated": false,
+  "truncated": false
+}

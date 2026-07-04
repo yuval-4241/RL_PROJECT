@@ -1,0 +1,49 @@
+{
+  "model": "o4-mini",
+  "prompt_idx": 240,
+  "rollout_idx": 7,
+  "content": "First, rephrase the \u201cno\u2010adjacency\u201d condition more graph\u2010theoretically.  Think of the 1000\u00d71000 board as the grid\u2010graph G with 10^6 vertices.  A domino is an edge in G, and the condition \u201cno two dominoes are adjacent\u201d means that no two chosen edges share a vertex or even have their endpoints joined by another edge.  In graph theory this is called an induced matching.  \n\n1) Upper bound by a counting\u2013forbidding argument.  \n   If you place one domino (an edge uv) then the two vertices u,v are occupied, and each of u and v has up to 3 other neighbors (besides each other) which are now forbidden to be used by any other domino.  That knocks out 2 occupied vertices + 6 forbidden = 8 vertices per domino.  Since there are 10^6 total vertices,  \n     maximum number of dominoes \u2264 10^6 / 8 = 125\u2009000.  \n\n2) Matching lower bound by a 4\u00d74\u2013block construction.  \n   Tile the 1000\u00d71000 board by 4\u00d74 blocks.  In each 4\u00d74 block place exactly two non\u2010adjacent dominoes, for instance (in local block coordinates 1\u2264i,j\u22644) place  \n     \u2022 one horizontal domino on cells (2,2)\u2013(2,3),  \n     \u2022 one vertical domino on cells (3,1)\u2013(4,1).  \n   One checks that within a block these two don\u2019t touch, and that when you repeat the same pattern in every 4\u00d74 block, no domino in one block becomes adjacent to any domino in a neighboring block.  \n\nSince there are (1000/4)^2=250^2=62\u2009500 blocks and each block carries 2 dominoes, this achieves 2\u22c562\u2009500=125\u2009000 dominoes.  \n\nCombined with the 10^6/8 upper bound, we conclude the maximum is exactly\n\\boxed{125000}.",
+  "raw": {
+    "id": "chatcmpl-DxfZiYiueN6ieudRGoAgPv3xM4riT",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "First, rephrase the \u201cno\u2010adjacency\u201d condition more graph\u2010theoretically.  Think of the 1000\u00d71000 board as the grid\u2010graph G with 10^6 vertices.  A domino is an edge in G, and the condition \u201cno two dominoes are adjacent\u201d means that no two chosen edges share a vertex or even have their endpoints joined by another edge.  In graph theory this is called an induced matching.  \n\n1) Upper bound by a counting\u2013forbidding argument.  \n   If you place one domino (an edge uv) then the two vertices u,v are occupied, and each of u and v has up to 3 other neighbors (besides each other) which are now forbidden to be used by any other domino.  That knocks out 2 occupied vertices + 6 forbidden = 8 vertices per domino.  Since there are 10^6 total vertices,  \n     maximum number of dominoes \u2264 10^6 / 8 = 125\u2009000.  \n\n2) Matching lower bound by a 4\u00d74\u2013block construction.  \n   Tile the 1000\u00d71000 board by 4\u00d74 blocks.  In each 4\u00d74 block place exactly two non\u2010adjacent dominoes, for instance (in local block coordinates 1\u2264i,j\u22644) place  \n     \u2022 one horizontal domino on cells (2,2)\u2013(2,3),  \n     \u2022 one vertical domino on cells (3,1)\u2013(4,1).  \n   One checks that within a block these two don\u2019t touch, and that when you repeat the same pattern in every 4\u00d74 block, no domino in one block becomes adjacent to any domino in a neighboring block.  \n\nSince there are (1000/4)^2=250^2=62\u2009500 blocks and each block carries 2 dominoes, this achieves 2\u22c562\u2009500=125\u2009000 dominoes.  \n\nCombined with the 10^6/8 upper bound, we conclude the maximum is exactly\n\\boxed{125000}.",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": [],
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1783113538,
+    "model": "o4-mini-2025-04-16",
+    "object": "chat.completion",
+    "moderation": null,
+    "service_tier": "default",
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 3714,
+      "prompt_tokens": 88,
+      "total_tokens": 3802,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 3264,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    }
+  },
+  "max_completion_tokens_used": 8192,
+  "escalated": false,
+  "truncated": false
+}

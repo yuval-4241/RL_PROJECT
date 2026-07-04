@@ -1,0 +1,49 @@
+{
+  "model": "o4-mini",
+  "prompt_idx": 240,
+  "rollout_idx": 8,
+  "content": "First, we observe that whenever two domino\u2010tiles are not allowed to share a side, each placed domino \u201cforbids\u2019\u2019 its two covered cells plus the (up to) six cells edge\u2013adjacent to those to be used by any other domino.  Hence each domino uses up at least 8 distinct board\u2010cells (2 for itself, 6 in its  edge\u2013neighborhood).  Since there are $10^6$ cells in all,\n\n$$8\\cdot(\\text{number of dominoes})\\;\\le\\;10^6\n\\;\\Longrightarrow\\;\n\\text{number of dominoes}\\;\\le\\;\\frac{10^6}{8}=125000.$$\n\nOn the other hand one easily attains $125000$ by the following \u201c2\u00d72\u2013block\u2019\u2019 construction.  Break the $1000\\times1000$ board into disjoint $2\\times2$ blocks.  Color these blocks in a checkerboard fashion.  There are exactly $500\\times500=250000$ such blocks, half of them \u201cblack\u2019\u2019 and half \u201cwhite.\u2019\u2019  In each black $2\\times2$\u2013block place exactly one domino (say horizontally).  Since no two black blocks share an edge, no two of our dominoes ever become edge\u2013adjacent (they only meet at most at a corner, which is allowed).  This yields\n\n$$\\#\\{\\text{dominoes}\\} \\;=\\; \\frac{250000}{2}\\;=\\;125000$$\n\nexactly.  Hence the maximum possible is\n\n\\[\n\\boxed{125000}.\n\\]",
+  "raw": {
+    "id": "chatcmpl-DxfZmRjdM61xvrw9Ze4tju9jx9z5F",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "First, we observe that whenever two domino\u2010tiles are not allowed to share a side, each placed domino \u201cforbids\u2019\u2019 its two covered cells plus the (up to) six cells edge\u2013adjacent to those to be used by any other domino.  Hence each domino uses up at least 8 distinct board\u2010cells (2 for itself, 6 in its  edge\u2013neighborhood).  Since there are $10^6$ cells in all,\n\n$$8\\cdot(\\text{number of dominoes})\\;\\le\\;10^6\n\\;\\Longrightarrow\\;\n\\text{number of dominoes}\\;\\le\\;\\frac{10^6}{8}=125000.$$\n\nOn the other hand one easily attains $125000$ by the following \u201c2\u00d72\u2013block\u2019\u2019 construction.  Break the $1000\\times1000$ board into disjoint $2\\times2$ blocks.  Color these blocks in a checkerboard fashion.  There are exactly $500\\times500=250000$ such blocks, half of them \u201cblack\u2019\u2019 and half \u201cwhite.\u2019\u2019  In each black $2\\times2$\u2013block place exactly one domino (say horizontally).  Since no two black blocks share an edge, no two of our dominoes ever become edge\u2013adjacent (they only meet at most at a corner, which is allowed).  This yields\n\n$$\\#\\{\\text{dominoes}\\} \\;=\\; \\frac{250000}{2}\\;=\\;125000$$\n\nexactly.  Hence the maximum possible is\n\n\\[\n\\boxed{125000}.\n\\]",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": [],
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1783113542,
+    "model": "o4-mini-2025-04-16",
+    "object": "chat.completion",
+    "moderation": null,
+    "service_tier": "default",
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 7592,
+      "prompt_tokens": 88,
+      "total_tokens": 7680,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 7232,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    }
+  },
+  "max_completion_tokens_used": 8192,
+  "escalated": false,
+  "truncated": false
+}

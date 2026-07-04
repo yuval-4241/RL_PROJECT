@@ -1,0 +1,49 @@
+{
+  "model": "o4-mini",
+  "prompt_idx": 240,
+  "rollout_idx": 14,
+  "content": "First, rephrase the problem in graph\u2010theoretic terms.  Think of the \\(1000\\times1000\\) board as the grid graph \\(P_{1000}\\times P_{1000}\\): its vertices are the unit\u2010squares and two vertices are joined by an edge exactly when the corresponding squares share a side.  A domino covering two adjacent squares is then an edge of this graph, and the condition \u201cno two dominoes are adjacent\u201d means exactly that no two chosen edges may share a vertex or even be joined by an edge.  Equivalently, we are looking for a maximum *induced* matching in the \\(1000\\times1000\\) grid.\n\nA very natural way to guarantee the \u201cno\u2010adjacency\u2019\u2019 condition is to partition the board into disjoint \\(2\\times2\\) blocks and place exactly one domino in each block.  Since a \\(2\\times2\\) square has exactly two horizontal edges and two vertical edges, and any two of those lie either sharing a vertex or sharing an edge, you can put at most one domino in each \\(2\\times2\\).  Conversely, you *can* choose exactly one (say, the top two squares) from every \\(2\\times2\\) block, and those dominoes will not touch each other along an edge.\n\nHow many such \\(2\\times2\\) blocks fit in a \\(1000\\times1000\\) board?  Well, you chop each side into 500 consecutive pairs, so you get\n\\[\n\\frac{1000}{2}\\times\\frac{1000}{2}\\;=\\;500\\times500\\;=\\;250\\,000\n\\]\nblocks, and hence you can place 250\u2009000 dominoes.  \n\nIt remains only to argue that no larger arrangement is possible.  One way to see this is via a simple counting\u2010and\u2010pigeonhole bound: each domino covers 2 squares and (forbids by adjacency) at least 2 more squares in its own \\(2\\times2\\) cell from ever being used by a *second* domino in that cell.  Thus each \\(2\\times2\\) block can contain *at most* one domino, giving the upper bound of \\(250\\,000\\).  \n\nTherefore the maximum number of non\u2010adjacent dominoes that one can place is\n\n\\[\n\\boxed{250000}.\n\\]",
+  "raw": {
+    "id": "chatcmpl-Dxfb6FGO6FG02IWXki50v6vFDrMa4",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "First, rephrase the problem in graph\u2010theoretic terms.  Think of the \\(1000\\times1000\\) board as the grid graph \\(P_{1000}\\times P_{1000}\\): its vertices are the unit\u2010squares and two vertices are joined by an edge exactly when the corresponding squares share a side.  A domino covering two adjacent squares is then an edge of this graph, and the condition \u201cno two dominoes are adjacent\u201d means exactly that no two chosen edges may share a vertex or even be joined by an edge.  Equivalently, we are looking for a maximum *induced* matching in the \\(1000\\times1000\\) grid.\n\nA very natural way to guarantee the \u201cno\u2010adjacency\u2019\u2019 condition is to partition the board into disjoint \\(2\\times2\\) blocks and place exactly one domino in each block.  Since a \\(2\\times2\\) square has exactly two horizontal edges and two vertical edges, and any two of those lie either sharing a vertex or sharing an edge, you can put at most one domino in each \\(2\\times2\\).  Conversely, you *can* choose exactly one (say, the top two squares) from every \\(2\\times2\\) block, and those dominoes will not touch each other along an edge.\n\nHow many such \\(2\\times2\\) blocks fit in a \\(1000\\times1000\\) board?  Well, you chop each side into 500 consecutive pairs, so you get\n\\[\n\\frac{1000}{2}\\times\\frac{1000}{2}\\;=\\;500\\times500\\;=\\;250\\,000\n\\]\nblocks, and hence you can place 250\u2009000 dominoes.  \n\nIt remains only to argue that no larger arrangement is possible.  One way to see this is via a simple counting\u2010and\u2010pigeonhole bound: each domino covers 2 squares and (forbids by adjacency) at least 2 more squares in its own \\(2\\times2\\) cell from ever being used by a *second* domino in that cell.  Thus each \\(2\\times2\\) block can contain *at most* one domino, giving the upper bound of \\(250\\,000\\).  \n\nTherefore the maximum number of non\u2010adjacent dominoes that one can place is\n\n\\[\n\\boxed{250000}.\n\\]",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": [],
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1783113624,
+    "model": "o4-mini-2025-04-16",
+    "object": "chat.completion",
+    "moderation": null,
+    "service_tier": "default",
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 6283,
+      "prompt_tokens": 88,
+      "total_tokens": 6371,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 5760,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    }
+  },
+  "max_completion_tokens_used": 8192,
+  "escalated": false,
+  "truncated": false
+}

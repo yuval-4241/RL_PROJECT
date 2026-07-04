@@ -1,0 +1,49 @@
+{
+  "model": "o4-mini",
+  "prompt_idx": 772,
+  "rollout_idx": 7,
+  "content": "First note that if \\(n<17\\) then\n\\[\nn^2-15n-27<0,\n\\]\nwhile the product of the digits of \\(n\\) is \\(\\ge0\\), so no solutions there.  Hence \\(n\\ge17\\).\n\n-- For a two\u2010digit \\(n\\), say \\(n=10a+b\\), the digit\u2010product is \\(ab\\le9\\cdot9=81\\).  \nSolve\n\\[\nn^2-15n-27\\le81\n\\;\\Longrightarrow\\;\nn^2-15n-108\\le0,\n\\]\nwhose positive root is about \\(20.3\\).  Thus we only need to check \\(17,18,19,20\\):\n\n17:\u2003digits \\(1,7\\) \u21d2 product \\(7\\),  \n\u2003\u2003\\(17^2-15\\cdot17-27=289-255-27=7\\).  OK.\n\n18:\u2003product \\(8\\),  \n\u2003\u2003\\(18^2-15\\cdot18-27=324-270-27=27\\neq8\\).\n\n19:\u2003product \\(9\\),  \n\u2003\u2003\\(19^2-15\\cdot19-27=361-285-27=49\\neq9\\).\n\n20:\u2003product \\(0\\),  \n\u2003\u2003\\(20^2-15\\cdot20-27=400-300-27=73\\neq0\\).\n\nNo other two\u2010digit \\(n\\ge17\\) can work because \\(n^2-15n-27>81\\) for \\(n\\ge21\\).\n\n-- For three or more digits, one checks that\n\\[\nn^2-15n-27\n\\]\nexceeds the maximal possible digit\u2010product \\(9^d\\) once \\(n\\) is large enough\u2014and in fact already for \\(n\\ge37\\) the quadratic\nexceeds \\(9^3=729\\).  No new solutions occur.\n\nHence the only solution is \\(n=17\\), and the sum of all solutions is\n\\[\n\\boxed{17}.\n\\]",
+  "raw": {
+    "id": "chatcmpl-DxfioknynKGboKPB5esjOYMXD7shP",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "First note that if \\(n<17\\) then\n\\[\nn^2-15n-27<0,\n\\]\nwhile the product of the digits of \\(n\\) is \\(\\ge0\\), so no solutions there.  Hence \\(n\\ge17\\).\n\n-- For a two\u2010digit \\(n\\), say \\(n=10a+b\\), the digit\u2010product is \\(ab\\le9\\cdot9=81\\).  \nSolve\n\\[\nn^2-15n-27\\le81\n\\;\\Longrightarrow\\;\nn^2-15n-108\\le0,\n\\]\nwhose positive root is about \\(20.3\\).  Thus we only need to check \\(17,18,19,20\\):\n\n17:\u2003digits \\(1,7\\) \u21d2 product \\(7\\),  \n\u2003\u2003\\(17^2-15\\cdot17-27=289-255-27=7\\).  OK.\n\n18:\u2003product \\(8\\),  \n\u2003\u2003\\(18^2-15\\cdot18-27=324-270-27=27\\neq8\\).\n\n19:\u2003product \\(9\\),  \n\u2003\u2003\\(19^2-15\\cdot19-27=361-285-27=49\\neq9\\).\n\n20:\u2003product \\(0\\),  \n\u2003\u2003\\(20^2-15\\cdot20-27=400-300-27=73\\neq0\\).\n\nNo other two\u2010digit \\(n\\ge17\\) can work because \\(n^2-15n-27>81\\) for \\(n\\ge21\\).\n\n-- For three or more digits, one checks that\n\\[\nn^2-15n-27\n\\]\nexceeds the maximal possible digit\u2010product \\(9^d\\) once \\(n\\) is large enough\u2014and in fact already for \\(n\\ge37\\) the quadratic\nexceeds \\(9^3=729\\).  No new solutions occur.\n\nHence the only solution is \\(n=17\\), and the sum of all solutions is\n\\[\n\\boxed{17}.\n\\]",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": [],
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1783114102,
+    "model": "o4-mini-2025-04-16",
+    "object": "chat.completion",
+    "moderation": null,
+    "service_tier": "default",
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 3929,
+      "prompt_tokens": 51,
+      "total_tokens": 3980,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 3456,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    }
+  },
+  "max_completion_tokens_used": 8192,
+  "escalated": false,
+  "truncated": false
+}

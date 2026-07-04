@@ -1,0 +1,41 @@
+{
+  "model": "Qwen/Qwen2.5-Math-7B:featherless-ai",
+  "prompt_idx": 142,
+  "rollout_idx": 3,
+  "content": "[/i]",
+  "raw": {
+    "id": "fe92133e-88d9-4980-967d-09304310a630",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "[/i]",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": null,
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1783157700,
+    "model": "Qwen/Qwen2.5-Math-7B",
+    "object": "chat.completion",
+    "moderation": null,
+    "service_tier": null,
+    "system_fingerprint": "fp1-rss-s2",
+    "usage": {
+      "completion_tokens": 3,
+      "prompt_tokens": 217,
+      "total_tokens": 220,
+      "completion_tokens_details": null,
+      "prompt_tokens_details": null
+    }
+  },
+  "max_tokens_used": 2048,
+  "escalated": false,
+  "truncated": false
+}

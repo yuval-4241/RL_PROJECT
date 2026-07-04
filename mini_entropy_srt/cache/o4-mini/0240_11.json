@@ -1,0 +1,49 @@
+{
+  "model": "o4-mini",
+  "prompt_idx": 240,
+  "rollout_idx": 11,
+  "content": "First, we show an upper\u2010bound of 250\u2009000, by a simple \u201cno two in a 2\u00d72 block\u2019\u2019 argument.  Partition the 1000\u00d71000 board into disjoint 2\u00d72 squares.  In any single 2\u00d72 square one checks easily that you cannot place two non\u2010adjacent dominoes\u2014hence at most one domino per 2\u00d72 block.  Since there are (1000/2)\u00b2=500\u00b2=250\u2009000 such blocks, no more than 250\u2009000 dominoes can be placed.\n\nNext, we exhibit a placement achieving 250\u2009000.  Tile the board by 250\u00d7250 copies of a 4\u00d74 \u201csuper\u2010block\u2019\u2019 and in each 4\u00d74 block place exactly four dominoes as follows (coordinates inside the block run from 1 to 4 in each direction):\n\n1) A horizontal domino covering (1,2)\u2013(1,3).  \n2) A horizontal domino covering (4,2)\u2013(4,3).  \n3) A vertical domino covering (2,1)\u2013(3,1).  \n4) A vertical domino covering (2,4)\u2013(3,4).\n\nOne checks that within each 4\u00d74 block no two of these four dominoes touch edge\u2010to\u2010edge, and that dominoes in adjacent 4\u00d74 blocks remain at least one empty layer apart.  Thus this pattern is globally legal, and uses exactly 4 dominoes per 16 cells, i.e. \u00bc of the cells are covered by dominoes, so in total\n\n   (1000\u00b71000)/16 \u00b7 4  = 250\u2009000\n\ndominoes.\n\nHence the maximum possible is\n\n\\boxed{250000}.",
+  "raw": {
+    "id": "chatcmpl-DxfaTCnasij41EviBimrdC0gyfxG8",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "First, we show an upper\u2010bound of 250\u2009000, by a simple \u201cno two in a 2\u00d72 block\u2019\u2019 argument.  Partition the 1000\u00d71000 board into disjoint 2\u00d72 squares.  In any single 2\u00d72 square one checks easily that you cannot place two non\u2010adjacent dominoes\u2014hence at most one domino per 2\u00d72 block.  Since there are (1000/2)\u00b2=500\u00b2=250\u2009000 such blocks, no more than 250\u2009000 dominoes can be placed.\n\nNext, we exhibit a placement achieving 250\u2009000.  Tile the board by 250\u00d7250 copies of a 4\u00d74 \u201csuper\u2010block\u2019\u2019 and in each 4\u00d74 block place exactly four dominoes as follows (coordinates inside the block run from 1 to 4 in each direction):\n\n1) A horizontal domino covering (1,2)\u2013(1,3).  \n2) A horizontal domino covering (4,2)\u2013(4,3).  \n3) A vertical domino covering (2,1)\u2013(3,1).  \n4) A vertical domino covering (2,4)\u2013(3,4).\n\nOne checks that within each 4\u00d74 block no two of these four dominoes touch edge\u2010to\u2010edge, and that dominoes in adjacent 4\u00d74 blocks remain at least one empty layer apart.  Thus this pattern is globally legal, and uses exactly 4 dominoes per 16 cells, i.e. \u00bc of the cells are covered by dominoes, so in total\n\n   (1000\u00b71000)/16 \u00b7 4  = 250\u2009000\n\ndominoes.\n\nHence the maximum possible is\n\n\\boxed{250000}.",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": [],
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1783113585,
+    "model": "o4-mini-2025-04-16",
+    "object": "chat.completion",
+    "moderation": null,
+    "service_tier": "default",
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 5189,
+      "prompt_tokens": 88,
+      "total_tokens": 5277,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 4800,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    }
+  },
+  "max_completion_tokens_used": 8192,
+  "escalated": false,
+  "truncated": false
+}

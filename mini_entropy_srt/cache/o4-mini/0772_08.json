@@ -1,0 +1,49 @@
+{
+  "model": "o4-mini",
+  "prompt_idx": 772,
+  "rollout_idx": 8,
+  "content": "First note that if \\(n\\) has \\(d\\) digits then \n\\[\n\\text{(product of digits of }n)\\;\\le 9^d,\n\\]\nwhereas\n\\[\nn^2-15n-27\\approx n^2\n\\]\ngrows much faster than \\(9^d\\) once \\(n\\) exceeds about \\(10^d\\).  A quick case\u2010by\u2010case check shows:\n\n1)  One\u2010digit \\(n\\le9\\):  then product of digits = \\(n\\), so\n   \\[\n     n=n^2-15n-27\n     \\;\\Longrightarrow\\;\n     n^2-16n-27=0,\n   \\]\n   which has no integer solutions in \\(\\{1,\\dots,9\\}.\\)\n\n2)  Two\u2010digit \\(n=10a+b\\) with \\(1\\le a\\le9\\), \\(0\\le b\\le9\\):\n    One bounds \\(n^2-15n-27\\le81\\) and checks \\(n=10,\\dots,99\\).  \n    In fact one finds the only solution is\n    \\[\n      n=17,\\quad 1\\cdot7=7,\\quad 17^2-15\\cdot17-27=7.\n    \\]\n\n3)  For three (or more) digits the quadratic \\(n^2-15n-27\\) already exceeds \\(9^d\\) before \\(n\\) even reaches \\(10^{d-1}\\), so no further solutions arise.\n\nHence the only positive integer solution is \\(n=17\\), and the requested sum is\n\\[\n\\boxed{17}.\n\\]",
+  "raw": {
+    "id": "chatcmpl-Dxfip3zaPI2Cxk8orlTS8EkdAiQxO",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "First note that if \\(n\\) has \\(d\\) digits then \n\\[\n\\text{(product of digits of }n)\\;\\le 9^d,\n\\]\nwhereas\n\\[\nn^2-15n-27\\approx n^2\n\\]\ngrows much faster than \\(9^d\\) once \\(n\\) exceeds about \\(10^d\\).  A quick case\u2010by\u2010case check shows:\n\n1)  One\u2010digit \\(n\\le9\\):  then product of digits = \\(n\\), so\n   \\[\n     n=n^2-15n-27\n     \\;\\Longrightarrow\\;\n     n^2-16n-27=0,\n   \\]\n   which has no integer solutions in \\(\\{1,\\dots,9\\}.\\)\n\n2)  Two\u2010digit \\(n=10a+b\\) with \\(1\\le a\\le9\\), \\(0\\le b\\le9\\):\n    One bounds \\(n^2-15n-27\\le81\\) and checks \\(n=10,\\dots,99\\).  \n    In fact one finds the only solution is\n    \\[\n      n=17,\\quad 1\\cdot7=7,\\quad 17^2-15\\cdot17-27=7.\n    \\]\n\n3)  For three (or more) digits the quadratic \\(n^2-15n-27\\) already exceeds \\(9^d\\) before \\(n\\) even reaches \\(10^{d-1}\\), so no further solutions arise.\n\nHence the only positive integer solution is \\(n=17\\), and the requested sum is\n\\[\n\\boxed{17}.\n\\]",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": [],
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1783114103,
+    "model": "o4-mini-2025-04-16",
+    "object": "chat.completion",
+    "moderation": null,
+    "service_tier": "default",
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 2880,
+      "prompt_tokens": 51,
+      "total_tokens": 2931,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 2496,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    }
+  },
+  "max_completion_tokens_used": 8192,
+  "escalated": false,
+  "truncated": false
+}

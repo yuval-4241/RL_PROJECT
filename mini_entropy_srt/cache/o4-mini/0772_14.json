@@ -1,0 +1,49 @@
+{
+  "model": "o4-mini",
+  "prompt_idx": 772,
+  "rollout_idx": 14,
+  "content": "First note that if \\(n\\) has any digit zero then the left\u2010hand side (the product of the digits) is 0, while for \\(n\\ge17\\) the right\u2010hand side\n\\[\nn^2-15n-27>0,\n\\]\nso no solution can have a zero digit.  Moreover for a \\(d\\)\u2010digit number with \\(d\\ge3\\), the maximum digit\u2010product is \\(9^d\\), which grows much more slowly than \\(n^2\\), and one checks that already for \\(n\\ge37\\),\n\\[\nn^2-15n-27>9^3=729,\n\\]\nso there can be no three\u2010digit (or longer) solutions.  Thus we need only check \\(1\\le n\\le99\\), excluding any with a zero digit.  \n\nChecking one\u2010digit \\(n\\) or \\(10\\le n\\le16\\) yields no solutions.  For two\u2010digit \\(n=10a+b\\) with \\(1\\le a,b\\le9\\) the equation becomes\n\\[\nab \\;=\\;(10a+b)^2-15(10a+b)-27,\n\\]\nwhich reduces to the quadratic in \\(b\\)\n\\[\nb^2+(19a-15)b+(100a^2-150a-27)=0.\n\\]\nIts discriminant is \n\\[\n\\Delta=(19a-15)^2-4(100a^2-150a-27)\n=-39a^2+30a+333,\n\\]\nand one checks that the only \\(1\\le a\\le9\\) making \\(\\Delta\\) a nonnegative perfect square is \\(a=1\\), giving \\(\\Delta=324\\).  Then\n\\[\nb=\\frac{-(19\\cdot1-15)\\pm18}2\n=\\frac{-4\\pm18}2\n\\]\nand the only digit solution is \\(b=7\\).  Hence the unique solution is\n\\[\nn=17.\n\\]\nTherefore the sum of all positive integer solutions is\n\\[\n\\boxed{17}.\n\\]",
+  "raw": {
+    "id": "chatcmpl-Dxfj8SgMzz35m4MIGIAvNtARljORM",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "First note that if \\(n\\) has any digit zero then the left\u2010hand side (the product of the digits) is 0, while for \\(n\\ge17\\) the right\u2010hand side\n\\[\nn^2-15n-27>0,\n\\]\nso no solution can have a zero digit.  Moreover for a \\(d\\)\u2010digit number with \\(d\\ge3\\), the maximum digit\u2010product is \\(9^d\\), which grows much more slowly than \\(n^2\\), and one checks that already for \\(n\\ge37\\),\n\\[\nn^2-15n-27>9^3=729,\n\\]\nso there can be no three\u2010digit (or longer) solutions.  Thus we need only check \\(1\\le n\\le99\\), excluding any with a zero digit.  \n\nChecking one\u2010digit \\(n\\) or \\(10\\le n\\le16\\) yields no solutions.  For two\u2010digit \\(n=10a+b\\) with \\(1\\le a,b\\le9\\) the equation becomes\n\\[\nab \\;=\\;(10a+b)^2-15(10a+b)-27,\n\\]\nwhich reduces to the quadratic in \\(b\\)\n\\[\nb^2+(19a-15)b+(100a^2-150a-27)=0.\n\\]\nIts discriminant is \n\\[\n\\Delta=(19a-15)^2-4(100a^2-150a-27)\n=-39a^2+30a+333,\n\\]\nand one checks that the only \\(1\\le a\\le9\\) making \\(\\Delta\\) a nonnegative perfect square is \\(a=1\\), giving \\(\\Delta=324\\).  Then\n\\[\nb=\\frac{-(19\\cdot1-15)\\pm18}2\n=\\frac{-4\\pm18}2\n\\]\nand the only digit solution is \\(b=7\\).  Hence the unique solution is\n\\[\nn=17.\n\\]\nTherefore the sum of all positive integer solutions is\n\\[\n\\boxed{17}.\n\\]",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": [],
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1783114122,
+    "model": "o4-mini-2025-04-16",
+    "object": "chat.completion",
+    "moderation": null,
+    "service_tier": "default",
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 2843,
+      "prompt_tokens": 51,
+      "total_tokens": 2894,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 2368,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    }
+  },
+  "max_completion_tokens_used": 8192,
+  "escalated": false,
+  "truncated": false
+}

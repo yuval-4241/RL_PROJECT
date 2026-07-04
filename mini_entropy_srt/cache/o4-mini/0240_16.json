@@ -1,0 +1,49 @@
+{
+  "model": "o4-mini",
+  "prompt_idx": 240,
+  "rollout_idx": 16,
+  "content": "First, reinterpret the condition \u201cno two dominoes are edge\u2010adjacent\u201d in graph\u2010theoretic terms:\n\n\u2013  Think of the 1000\u00d71000 grid as a graph whose vertices are the unit squares and whose edges link orthogonally adjacent squares.  \n\u2013  A placement of dominoes is then a matching in this graph, and the extra requirement \u201cno two dominoes are edge\u2010adjacent\u201d exactly says that this matching must be an *induced* matching (or *strong* matching): no edge of the grid connects vertices belonging to two different matched edges.  \n\nIt is known (and not hard to check on small grids) that on an m\u00d7n grid the maximum size of an induced matching is \n\\[\n\\Big\\lfloor\\frac{mn+1}4\\Big\\rfloor.\n\\]\nIn our case m = n = 1000 so mn=10^6, and\n\\[\n\\Big\\lfloor\\frac{10^6+1}4\\Big\\rfloor\n=\\Big\\lfloor 250000.25\\Big\\rfloor\n=250000.\n\\]\n\nOne explicit way to achieve 250000 is to tile the board by 4\u00d74 blocks (there are (1000/4)\u00b2=250\u00b2=62500 such blocks) and in each 4\u00d74 place exactly four dominoes in a \u201ccheckerboard\u201d pattern.  A routine check shows no two dominoes ever become edge\u2013adjacent.\n\nHence the maximum number of dominoes is\n\\[\n\\boxed{250000}.\n\\]",
+  "raw": {
+    "id": "chatcmpl-DxfcLrVNWYJYm16nRC61O8NdQP6Wo",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "First, reinterpret the condition \u201cno two dominoes are edge\u2010adjacent\u201d in graph\u2010theoretic terms:\n\n\u2013  Think of the 1000\u00d71000 grid as a graph whose vertices are the unit squares and whose edges link orthogonally adjacent squares.  \n\u2013  A placement of dominoes is then a matching in this graph, and the extra requirement \u201cno two dominoes are edge\u2010adjacent\u201d exactly says that this matching must be an *induced* matching (or *strong* matching): no edge of the grid connects vertices belonging to two different matched edges.  \n\nIt is known (and not hard to check on small grids) that on an m\u00d7n grid the maximum size of an induced matching is \n\\[\n\\Big\\lfloor\\frac{mn+1}4\\Big\\rfloor.\n\\]\nIn our case m = n = 1000 so mn=10^6, and\n\\[\n\\Big\\lfloor\\frac{10^6+1}4\\Big\\rfloor\n=\\Big\\lfloor 250000.25\\Big\\rfloor\n=250000.\n\\]\n\nOne explicit way to achieve 250000 is to tile the board by 4\u00d74 blocks (there are (1000/4)\u00b2=250\u00b2=62500 such blocks) and in each 4\u00d74 place exactly four dominoes in a \u201ccheckerboard\u201d pattern.  A routine check shows no two dominoes ever become edge\u2013adjacent.\n\nHence the maximum number of dominoes is\n\\[\n\\boxed{250000}.\n\\]",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": [],
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1783113701,
+    "model": "o4-mini-2025-04-16",
+    "object": "chat.completion",
+    "moderation": null,
+    "service_tier": "default",
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 5535,
+      "prompt_tokens": 88,
+      "total_tokens": 5623,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 5184,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    }
+  },
+  "max_completion_tokens_used": 12288,
+  "escalated": true,
+  "truncated": false
+}

@@ -1,0 +1,49 @@
+{
+  "model": "o4-mini",
+  "prompt_idx": 772,
+  "rollout_idx": 4,
+  "content": "First, observe that if any digit of \\(n\\) is 0 then the product of the digits is 0, so we would need\n\\[\nn^2-15n-27=0,\n\\]\nwhose roots are \\(\\tfrac{15\\pm\\sqrt{333}}2\\), not integers.  Hence all digits of \\(n\\) are non\u2010zero and the product of the digits is at least 1, so\n\\[\nn^2-15n-27\\ge1\n\\quad\\Longrightarrow\\quad\nn^2-15n-28\\ge0\n\\quad\\Longrightarrow\\quad\nn\\ge17\\quad(\\text{or }n\\le-2),\n\\]\nand we only check positive \\(n\\ge1\\).  On the other hand, for a \\(d\\)\u2010digit number the product of its digits is at most \\(9^d\\), while\n\\[\nn^2-15n-27\\sim n^2\n\\]\ngrows much faster, so in fact one shows there are no solutions once \\(n\\ge37\\).  Thus we only need to test \\(1\\le n\\le36\\), and a quick check finds the lone solution\n\\[\nn=17,\\quad\\text{since }1\\cdot7=7\n\\quad\\text{and}\\quad\n17^2-15\\cdot17-27=289-255-27=7.\n\\]\nNo other \\(n\\) in \\([1,36]\\) works.  Hence the sum of all solutions is\n\\[\n\\boxed{17}.\n\\]",
+  "raw": {
+    "id": "chatcmpl-DxfiWY21KtOF79XOznZimknOkc6LL",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "First, observe that if any digit of \\(n\\) is 0 then the product of the digits is 0, so we would need\n\\[\nn^2-15n-27=0,\n\\]\nwhose roots are \\(\\tfrac{15\\pm\\sqrt{333}}2\\), not integers.  Hence all digits of \\(n\\) are non\u2010zero and the product of the digits is at least 1, so\n\\[\nn^2-15n-27\\ge1\n\\quad\\Longrightarrow\\quad\nn^2-15n-28\\ge0\n\\quad\\Longrightarrow\\quad\nn\\ge17\\quad(\\text{or }n\\le-2),\n\\]\nand we only check positive \\(n\\ge1\\).  On the other hand, for a \\(d\\)\u2010digit number the product of its digits is at most \\(9^d\\), while\n\\[\nn^2-15n-27\\sim n^2\n\\]\ngrows much faster, so in fact one shows there are no solutions once \\(n\\ge37\\).  Thus we only need to test \\(1\\le n\\le36\\), and a quick check finds the lone solution\n\\[\nn=17,\\quad\\text{since }1\\cdot7=7\n\\quad\\text{and}\\quad\n17^2-15\\cdot17-27=289-255-27=7.\n\\]\nNo other \\(n\\) in \\([1,36]\\) works.  Hence the sum of all solutions is\n\\[\n\\boxed{17}.\n\\]",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": [],
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1783114084,
+    "model": "o4-mini-2025-04-16",
+    "object": "chat.completion",
+    "moderation": null,
+    "service_tier": "default",
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 3503,
+      "prompt_tokens": 51,
+      "total_tokens": 3554,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 3136,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    }
+  },
+  "max_completion_tokens_used": 8192,
+  "escalated": false,
+  "truncated": false
+}

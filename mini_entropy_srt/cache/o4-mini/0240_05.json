@@ -1,0 +1,49 @@
+{
+  "model": "o4-mini",
+  "prompt_idx": 240,
+  "rollout_idx": 5,
+  "content": "First, rephrase the condition in graph\u2010theoretic language.  Think of the $1000\\times1000$ grid as the vertices of the usual grid\u2010graph $G$, with edges between horizontally or vertically adjacent squares.  A domino is then an edge of $G$, and the requirement that no two dominoes are adjacent (though they may touch at a corner) is exactly the statement that we want an induced matching in $G$\u2014that is, a set of edges no two of which share a vertex or even have their endpoints joined by another edge of $G$.\n\nIt is known (and one can exhibit a simple $4\\times4$\u2013periodic pattern) that the maximum density of an induced matching in the infinite grid is $\\tfrac14$.  Restricting to a finite $1000\\times1000$ board (which is divisible by $4$ in each direction) one can tile it by $4\\times4$ squares and in each $4\\times4$ block select exactly one domino in \u201crow\u20102, columns $1\\mod4$\u2019\u2019 and one in \u201ccolumn\u20104, rows $3\\mod4$\u2019\u2019 (for instance).  This places exactly $1$ domino per $4\\times4$ block, i.e.\\ $1$ domino per $16$ cells, hence density $1/4$.  Since there are $10^6$ cells, this produces\n\\[\n\\frac{10^6}{4}\\;=\\;250\\,000\n\\]\ndominoes.  One also shows by a simple counting/averaging argument that no induced matching can exceed density $1/4$ on the grid, so this construction is best possible.\n\nAnswer: \\boxed{250000}\\,.",
+  "raw": {
+    "id": "chatcmpl-DxfZDXmzAsylPkGiNNGtumszUIabi",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "First, rephrase the condition in graph\u2010theoretic language.  Think of the $1000\\times1000$ grid as the vertices of the usual grid\u2010graph $G$, with edges between horizontally or vertically adjacent squares.  A domino is then an edge of $G$, and the requirement that no two dominoes are adjacent (though they may touch at a corner) is exactly the statement that we want an induced matching in $G$\u2014that is, a set of edges no two of which share a vertex or even have their endpoints joined by another edge of $G$.\n\nIt is known (and one can exhibit a simple $4\\times4$\u2013periodic pattern) that the maximum density of an induced matching in the infinite grid is $\\tfrac14$.  Restricting to a finite $1000\\times1000$ board (which is divisible by $4$ in each direction) one can tile it by $4\\times4$ squares and in each $4\\times4$ block select exactly one domino in \u201crow\u20102, columns $1\\mod4$\u2019\u2019 and one in \u201ccolumn\u20104, rows $3\\mod4$\u2019\u2019 (for instance).  This places exactly $1$ domino per $4\\times4$ block, i.e.\\ $1$ domino per $16$ cells, hence density $1/4$.  Since there are $10^6$ cells, this produces\n\\[\n\\frac{10^6}{4}\\;=\\;250\\,000\n\\]\ndominoes.  One also shows by a simple counting/averaging argument that no induced matching can exceed density $1/4$ on the grid, so this construction is best possible.\n\nAnswer: \\boxed{250000}\\,.",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": [],
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1783113507,
+    "model": "o4-mini-2025-04-16",
+    "object": "chat.completion",
+    "moderation": null,
+    "service_tier": "default",
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 7489,
+      "prompt_tokens": 88,
+      "total_tokens": 7577,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 7104,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    }
+  },
+  "max_completion_tokens_used": 8192,
+  "escalated": false,
+  "truncated": false
+}

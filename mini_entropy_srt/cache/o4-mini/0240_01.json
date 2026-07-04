@@ -1,0 +1,49 @@
+{
+  "model": "o4-mini",
+  "prompt_idx": 240,
+  "rollout_idx": 1,
+  "content": "First, we show an easy upper\u2010bound of $250\\,000$ by chopping the $1000\\times1000$ board into $2\\times2$ little squares:\n\n1.  Partition the whole board into disjoint $2\\times2$ blocks.  There are exactly \n    \\[\n      \\frac{1000}{2}\\times\\frac{1000}{2}=500\\times500=250\\,000\n    \\]\n    such blocks.\n\n2.  In any single $2\\times2$ block one can place at most one domino without two dominoes becoming edge\u2013adjacent.  (If you tried two dominoes in the same $2\\times2$ block, at least one cell of one domino would share a side with a cell of the other.)\n\nHence no packing can exceed $250\\,000$ dominoes.\n\n---\n\nNext, we exhibit a packing that actually attains $250\\,000$.  Label the $2\\times2$ blocks by their \u201cblock\u2013coordinates\u201d $(a,b)$ with $1\\le a,b\\le500$.  Within each block\n\n-  If $b$ is even, place a horizontal domino in its top row,\n-  If $b$ is odd, place a horizontal domino in its bottom row.\n\nBecause the blocks in the same column never \u201cstack\u201d their dominos in the same row, vertical adjacency is avoided; and because adjacent blocks in a row alternate top\u2013row vs. bottom\u2013row placements, horizontal adjacency is avoided.  One checks easily that no two dominoes share an edge, yet we have placed exactly one domino in each of the $500\\times500$ blocks.\n\nPutting these two facts together shows the maximum possible is\n\n\\[\n   \\boxed{250000}.\n\\]",
+  "raw": {
+    "id": "chatcmpl-DxfZDMNTErQhP70zkIIMLRvzo1pYV",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "First, we show an easy upper\u2010bound of $250\\,000$ by chopping the $1000\\times1000$ board into $2\\times2$ little squares:\n\n1.  Partition the whole board into disjoint $2\\times2$ blocks.  There are exactly \n    \\[\n      \\frac{1000}{2}\\times\\frac{1000}{2}=500\\times500=250\\,000\n    \\]\n    such blocks.\n\n2.  In any single $2\\times2$ block one can place at most one domino without two dominoes becoming edge\u2013adjacent.  (If you tried two dominoes in the same $2\\times2$ block, at least one cell of one domino would share a side with a cell of the other.)\n\nHence no packing can exceed $250\\,000$ dominoes.\n\n---\n\nNext, we exhibit a packing that actually attains $250\\,000$.  Label the $2\\times2$ blocks by their \u201cblock\u2013coordinates\u201d $(a,b)$ with $1\\le a,b\\le500$.  Within each block\n\n-  If $b$ is even, place a horizontal domino in its top row,\n-  If $b$ is odd, place a horizontal domino in its bottom row.\n\nBecause the blocks in the same column never \u201cstack\u201d their dominos in the same row, vertical adjacency is avoided; and because adjacent blocks in a row alternate top\u2013row vs. bottom\u2013row placements, horizontal adjacency is avoided.  One checks easily that no two dominoes share an edge, yet we have placed exactly one domino in each of the $500\\times500$ blocks.\n\nPutting these two facts together shows the maximum possible is\n\n\\[\n   \\boxed{250000}.\n\\]",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": [],
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1783113507,
+    "model": "o4-mini-2025-04-16",
+    "object": "chat.completion",
+    "moderation": null,
+    "service_tier": "default",
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 5890,
+      "prompt_tokens": 88,
+      "total_tokens": 5978,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 5504,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    }
+  },
+  "max_completion_tokens_used": 8192,
+  "escalated": false,
+  "truncated": false
+}

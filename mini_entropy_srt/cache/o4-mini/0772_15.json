@@ -1,0 +1,49 @@
+{
+  "model": "o4-mini",
+  "prompt_idx": 772,
+  "rollout_idx": 15,
+  "content": "First observe that for a positive integer \\(n\\), its digit\u2010product \\(P(n)\\ge0\\).  The equation is\n\n\u2003P(n) = n^2 \u2212 15n \u2212 27.\n\nThe quadratic \\(n^2\u221215n\u221227\\) is negative for \\(1\\le n\\le16\\) and becomes nonnegative only for \\(n\\ge17\\).  On the other hand, if \\(n\\) has\n- 1 digit then \\(P(n)\\le9\\), while \\(n^2\u221215n\u221227<0\\) for \\(n\\le16\\),\n- 2 digits then \\(P(n)\\le9\\cdot9=81\\), but \\(n^2\u221215n\u221227>81\\) already as soon as \\(n\\ge21\\).\n\nHence any solution must lie in \\(17\\le n\\le20\\).  Checking those four:\n\n\\(n=17:\\quad P(17)=1\\cdot7=7,\\quad 17^2-15\\cdot17-27=289-255-27=7\\)\\quad \u21d2 works.  \n\\(n=18:\\;P=8,\\;18^2-15\\cdot18-27=27\\) (no)  \n\\(n=19:\\;P=9,\\;19^2-15\\cdot19-27=49\\) (no)  \n\\(n=20:\\;P=0,\\;20^2-15\\cdot20-27=73\\) (no)\n\nThe only solution is \\(n=17\\), so the sum of all solutions is\n\n\\(\\boxed{17}\\).",
+  "raw": {
+    "id": "chatcmpl-DxfjAhkEp10i4DJzK1nffFeYov911",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "First observe that for a positive integer \\(n\\), its digit\u2010product \\(P(n)\\ge0\\).  The equation is\n\n\u2003P(n) = n^2 \u2212 15n \u2212 27.\n\nThe quadratic \\(n^2\u221215n\u221227\\) is negative for \\(1\\le n\\le16\\) and becomes nonnegative only for \\(n\\ge17\\).  On the other hand, if \\(n\\) has\n- 1 digit then \\(P(n)\\le9\\), while \\(n^2\u221215n\u221227<0\\) for \\(n\\le16\\),\n- 2 digits then \\(P(n)\\le9\\cdot9=81\\), but \\(n^2\u221215n\u221227>81\\) already as soon as \\(n\\ge21\\).\n\nHence any solution must lie in \\(17\\le n\\le20\\).  Checking those four:\n\n\\(n=17:\\quad P(17)=1\\cdot7=7,\\quad 17^2-15\\cdot17-27=289-255-27=7\\)\\quad \u21d2 works.  \n\\(n=18:\\;P=8,\\;18^2-15\\cdot18-27=27\\) (no)  \n\\(n=19:\\;P=9,\\;19^2-15\\cdot19-27=49\\) (no)  \n\\(n=20:\\;P=0,\\;20^2-15\\cdot20-27=73\\) (no)\n\nThe only solution is \\(n=17\\), so the sum of all solutions is\n\n\\(\\boxed{17}\\).",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": [],
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1783114124,
+    "model": "o4-mini-2025-04-16",
+    "object": "chat.completion",
+    "moderation": null,
+    "service_tier": "default",
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 2295,
+      "prompt_tokens": 51,
+      "total_tokens": 2346,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 1920,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    }
+  },
+  "max_completion_tokens_used": 8192,
+  "escalated": false,
+  "truncated": false
+}

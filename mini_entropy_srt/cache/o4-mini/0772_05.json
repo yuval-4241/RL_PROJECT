@@ -1,0 +1,49 @@
+{
+  "model": "o4-mini",
+  "prompt_idx": 772,
+  "rollout_idx": 5,
+  "content": "First, observe that if \\(n\\) has \\(k\\) digits then the maximum of the left\u2010hand side, \n\\[\nP(n)\\;=\\;\\prod\\text{(digits of }n),\n\\]\nis \\(9^k\\).  Meanwhile for large \\(n\\), \n\\[\nn^2-15n-27\\sim n^2,\n\\]\nwhich eventually far exceeds \\(9^k\\).  In fact one checks:\n\n1.  One\u2010digit \\(n\\le9\\) gives  \n   \\(P(n)=n\\) and the equation \n   \\[\n     n = n^2-15n-27\n     \\;\\Longrightarrow\\;\n     n^2-16n-27=0\n   \\]\n   has no integer root in \\(\\{1,\\dots,9\\}\\).\n\n2.  Two\u2010digit \\(n=10a+b\\) has \\(P(n)=ab\\).  A few inequalities show that if\n   \\[\n     n^2-15n-27 \\;>\\; 9\\cdot9=81\n   \\]\n   then no solution is possible, and\n   \\[\n     n^2-15n-27\\ge0\n     \\quad\\Longleftrightarrow\\quad\n     n\\ge17.\n   \\]\n   Hence one need only check \\(n=17,18,19,20\\):\n   \n   \\(n=17:\\quad P(17)=1\\cdot7=7,\\)\n   \n   \\(\\quad17^2-15\\cdot17-27=289-255-27=7,\\)  \u2713\n\n   \\(n=18:\\;P(18)=8,\\quad18^2-15\\cdot18-27=324-270-27=27,\\)  no  \n   \n   \\(n=19:\\;P(19)=9,\\quad19^2-15\\cdot19-27=361-285-27=49,\\)  no  \n   \n   \\(n=20:\\;P(20)=0,\\quad20^2-15\\cdot20-27=400-300-27=73,\\)  no.\n\nAll larger \\(n\\) fail because \\(n^2-15n-27\\) grows past the maximum digit\u2010product.  Hence the only solution is \\(n=17\\), and the sum of all solutions is\n\n\\[\n\\boxed{17}.\n\\]",
+  "raw": {
+    "id": "chatcmpl-DxfiWKqLG74hAu3ehaYSb7ExqxpQk",
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "logprobs": null,
+        "message": {
+          "content": "First, observe that if \\(n\\) has \\(k\\) digits then the maximum of the left\u2010hand side, \n\\[\nP(n)\\;=\\;\\prod\\text{(digits of }n),\n\\]\nis \\(9^k\\).  Meanwhile for large \\(n\\), \n\\[\nn^2-15n-27\\sim n^2,\n\\]\nwhich eventually far exceeds \\(9^k\\).  In fact one checks:\n\n1.  One\u2010digit \\(n\\le9\\) gives  \n   \\(P(n)=n\\) and the equation \n   \\[\n     n = n^2-15n-27\n     \\;\\Longrightarrow\\;\n     n^2-16n-27=0\n   \\]\n   has no integer root in \\(\\{1,\\dots,9\\}\\).\n\n2.  Two\u2010digit \\(n=10a+b\\) has \\(P(n)=ab\\).  A few inequalities show that if\n   \\[\n     n^2-15n-27 \\;>\\; 9\\cdot9=81\n   \\]\n   then no solution is possible, and\n   \\[\n     n^2-15n-27\\ge0\n     \\quad\\Longleftrightarrow\\quad\n     n\\ge17.\n   \\]\n   Hence one need only check \\(n=17,18,19,20\\):\n   \n   \\(n=17:\\quad P(17)=1\\cdot7=7,\\)\n   \n   \\(\\quad17^2-15\\cdot17-27=289-255-27=7,\\)  \u2713\n\n   \\(n=18:\\;P(18)=8,\\quad18^2-15\\cdot18-27=324-270-27=27,\\)  no  \n   \n   \\(n=19:\\;P(19)=9,\\quad19^2-15\\cdot19-27=361-285-27=49,\\)  no  \n   \n   \\(n=20:\\;P(20)=0,\\quad20^2-15\\cdot20-27=400-300-27=73,\\)  no.\n\nAll larger \\(n\\) fail because \\(n^2-15n-27\\) grows past the maximum digit\u2010product.  Hence the only solution is \\(n=17\\), and the sum of all solutions is\n\n\\[\n\\boxed{17}.\n\\]",
+          "refusal": null,
+          "role": "assistant",
+          "annotations": [],
+          "audio": null,
+          "function_call": null,
+          "tool_calls": null
+        }
+      }
+    ],
+    "created": 1783114084,
+    "model": "o4-mini-2025-04-16",
+    "object": "chat.completion",
+    "moderation": null,
+    "service_tier": "default",
+    "system_fingerprint": null,
+    "usage": {
+      "completion_tokens": 3867,
+      "prompt_tokens": 51,
+      "total_tokens": 3918,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": 0,
+        "audio_tokens": 0,
+        "reasoning_tokens": 3328,
+        "rejected_prediction_tokens": 0
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cached_tokens": 0
+      }
+    }
+  },
+  "max_completion_tokens_used": 8192,
+  "escalated": false,
+  "truncated": false
+}
