@@ -222,9 +222,18 @@ def generate_rollouts(model, tokenizer, prompt: str, n_rollouts: int, max_new_to
 
 def compute_sequence_logprobs(model, tokenizer, sequences: torch.Tensor, prompt_len: int):
     """Forward pass WITH gradients on the already-generated sequences; sum log-probs
-    of the generated (post-prompt) tokens only."""
+    of the generated (post-prompt) tokens only.
+
+    IMPORTANT: sequences come from model.generate() under torch.no_grad(), so they are
+    plain integer token ids with no grad history attached (which is correct -- you can't
+    backprop through discrete sampling). Gradients flow through the MODEL'S PARAMETERS
+    via this fresh forward pass, not through the sequence tensor itself. Make sure the
+    model is in train() mode (not eval()) so dropout/gradient-checkpointing behave correctly.
+    """
+    model.train()
+    sequences = sequences.detach()  # ensure no stale graph from generation is attached
     attention_mask = (sequences != tokenizer.pad_token_id).long()
-    outputs = model(input_ids=sequences, attention_mask=attention_mask)
+    outputs = model(input_ids=sequences, attention_mask=attention_mask, use_cache=False)
     logits = outputs.logits[:, :-1, :]  # predict token t+1 from position t
     targets = sequences[:, 1:]
     log_probs_all = torch.log_softmax(logits, dim=-1)
@@ -239,9 +248,15 @@ def compute_sequence_logprobs(model, tokenizer, sequences: torch.Tensor, prompt_
 # ---------------------------------------------------------------------------
 # One training step: generate -> reward -> advantage -> policy-gradient update
 # ---------------------------------------------------------------------------
-def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_rollouts, max_new_tokens):
+def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_rollouts, max_new_tokens, debug=False):
     texts, gen_outputs = generate_rollouts(model, tokenizer, prompt, n_rollouts, max_new_tokens)
     answers = [extract_boxed_answer(t) for t in texts]
+
+    if debug:
+        print(f"  [debug] ground_truth={ground_truth!r}")
+        for i, (t, a) in enumerate(zip(texts, answers)):
+            print(f"  [debug] rollout {i}: extracted={a!r} | raw_tail={t[-150:]!r}")
+
     rewards, majority_answer, agreement, true_accuracy = compute_rewards(answers, ground_truth, alpha)
 
     advantages = rloo_advantages(torch.tensor(rewards, dtype=torch.float32, device=model.device))
@@ -276,7 +291,7 @@ def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_ro
 def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, max_new_tokens):
     model.eval()
     accs, gaps, ents = [], [], []
-    sample = test_df.sample(min(n_eval_questions, len(test_df)))
+    sample = test_df.sample(min(n_eval_questions, len(test_df)), random_state=42)
     for _, row in sample.iterrows():
         prompt = extract_prompt_text(row["prompt"], tokenizer=tokenizer)
         texts, _ = generate_rollouts(model, tokenizer, prompt, n_rollouts, max_new_tokens)
@@ -318,8 +333,22 @@ def main():
     parser.add_argument("--lr", type=float, default=1e-6)
     parser.add_argument("--eval_every", type=int, default=10)
     parser.add_argument("--n_eval_questions", type=int, default=10)
+    parser.add_argument("--debug_steps", type=int, default=2,
+                         help="Print raw generated text + extracted answers for the "
+                              "first N training steps, to diagnose empty-parse issues.")
     parser.add_argument("--output", type=str, default="results/lightweight_run.json")
+    parser.add_argument("--seed", type=int, default=42,
+                         help="Random seed for training-question sampling (reproducibility).")
+    parser.add_argument("--eval_indices_path", type=str,
+                         default=str(Path.home() / "RL_Project/mini_entropy_srt/data/eval_indices.json"),
+                         help="Path to Day-1's eval_indices.json; those rows are EXCLUDED from "
+                              "training to avoid train/eval leakage.")
     args = parser.parse_args()
+
+    import random as _random
+    _random.seed(args.seed)
+    import numpy as _np
+    _np.random.seed(args.seed)
 
     print(f"=== Lightweight RLOO training: alpha={args.alpha}, n_steps={args.n_steps} ===\n")
 
@@ -340,18 +369,43 @@ def main():
     print("Loading data...")
     train_df = pd.read_parquet(args.train_parquet)
     test_df = pd.read_parquet(args.test_parquet)
+
+    # Exclude Day-1 eval-set rows from training to avoid train/eval leakage
+    eval_path = Path(args.eval_indices_path)
+    if eval_path.exists():
+        with open(eval_path) as f:
+            eval_data = json.load(f)
+        # eval_indices.json may store indices under various keys depending on how it
+        # was written on Day 1 -- check a few common shapes defensively.
+        eval_indices = (
+            eval_data.get("main_100")
+            or eval_data.get("eval_indices")
+            or eval_data.get("indices")
+            or []
+        )
+        before = len(train_df)
+        train_df = train_df.reset_index(drop=True)
+        train_df = train_df.drop(index=[i for i in eval_indices if i < len(train_df)], errors="ignore")
+        print(f"Excluded {before - len(train_df)} Day-1 eval rows from training pool "
+              f"(loaded from {eval_path}).")
+    else:
+        print(f"WARNING: eval_indices_path not found at {eval_path} -- "
+              f"could not exclude Day-1 eval rows. Proceeding with full train set "
+              f"(risk of train/eval overlap if eval questions come from this same file).")
+
     prompt_col = "prompt" if "prompt" in train_df.columns else train_df.columns[0]
-    print(f"Train rows: {len(train_df)}, Test rows: {len(test_df)}")
+    print(f"Train rows (after exclusion): {len(train_df)}, Test rows: {len(test_df)}")
 
     history = []
     for step in range(args.n_steps):
-        row = train_df.sample(1).iloc[0]
+        row = train_df.sample(1, random_state=args.seed + step).iloc[0]
         prompt = extract_prompt_text(row[prompt_col], tokenizer=tokenizer)
         ground_truth = extract_ground_truth(row)
 
         step_stats = training_step(
             model, tokenizer, optimizer, prompt, ground_truth,
             args.alpha, args.n_rollouts, args.max_new_tokens,
+            debug=(step < args.debug_steps),
         )
         print(f"step {step:4d} | loss={step_stats['loss']:.4f} "
               f"agreement={step_stats['agreement']:.3f} "
