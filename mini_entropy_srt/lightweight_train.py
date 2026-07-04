@@ -23,6 +23,17 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
+def is_placeholder_label(gt):
+    """DAPO's unlabeled train set uses a placeholder like 'LABEL_BY_SELF_CONSISTENCY'
+    instead of a real answer -- this is INTENTIONAL for self-training (no answer key
+    during training). Detect it so we don't compute a meaningless 'accuracy' against it."""
+    if gt is None:
+        return True
+    if isinstance(gt, str) and "SELF_CONSISTENCY" in gt.upper():
+        return True
+    return False
+
+
 def extract_ground_truth(row):
     """
     DAPO's parquet does NOT have a plain 'answer' or 'ground_truth' column.
@@ -258,6 +269,7 @@ def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_ro
             print(f"  [debug] rollout {i}: extracted={a!r} | raw_tail={t[-150:]!r}")
 
     rewards, majority_answer, agreement, true_accuracy = compute_rewards(answers, ground_truth, alpha)
+    train_acc_is_meaningful = not is_placeholder_label(ground_truth)
 
     advantages = rloo_advantages(torch.tensor(rewards, dtype=torch.float32, device=model.device))
 
@@ -280,7 +292,7 @@ def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_ro
     return {
         "loss": loss.item(),
         "agreement": agreement,
-        "true_accuracy": true_accuracy,
+        "true_accuracy": true_accuracy if train_acc_is_meaningful else None,
         "entropy": mean_entropy,
     }
 
@@ -329,7 +341,7 @@ def main():
     parser.add_argument("--alpha", type=float, default=0.0)
     parser.add_argument("--n_steps", type=int, default=20)
     parser.add_argument("--n_rollouts", type=int, default=4)
-    parser.add_argument("--max_new_tokens", type=int, default=256)
+    parser.add_argument("--max_new_tokens", type=int, default=512)
     parser.add_argument("--lr", type=float, default=1e-6)
     parser.add_argument("--eval_every", type=int, default=10)
     parser.add_argument("--n_eval_questions", type=int, default=10)
@@ -407,9 +419,10 @@ def main():
             args.alpha, args.n_rollouts, args.max_new_tokens,
             debug=(step < args.debug_steps),
         )
+        acc_str = f"{step_stats['true_accuracy']:.3f}" if step_stats['true_accuracy'] is not None else "N/A (unlabeled)"
         print(f"step {step:4d} | loss={step_stats['loss']:.4f} "
               f"agreement={step_stats['agreement']:.3f} "
-              f"train_acc={step_stats['true_accuracy']:.3f} "
+              f"train_acc={acc_str} "
               f"entropy={step_stats['entropy']:.3f}")
 
         record = {"step": step, **step_stats}
