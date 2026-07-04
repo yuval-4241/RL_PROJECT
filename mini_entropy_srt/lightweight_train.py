@@ -6,21 +6,28 @@ confirmed working on this GPU. Implements the same algorithm as the paper's SRT:
 majority-vote self-consistency reward + RLOO leave-one-out advantage, with an optional
 per-rollout entropy (surprisal) bonus.
 
+\\boxed{} extraction and ground-truth matching reuse repo_utils (the actual SRT repo's
+math_verify-based equivalence checker) -- same as baselines.py/entropy_reward.py -- so
+answers like \\boxed{0.5} and \\boxed{1/2} are correctly treated as equal, matching every
+other Day 1/2 script. This means the import only resolves when run as a module (see
+Usage below), not as a bare script.
+
 Usage:
-    python lightweight_train.py --alpha 0.0 --n_steps 20 --n_rollouts 4   # smoke test
-    python lightweight_train.py --alpha 0.3 --n_steps 500 --n_rollouts 8  # real run
+    python -m mini_entropy_srt.lightweight_train --alpha 0.0 --n_steps 20 --n_rollouts 4   # smoke test
+    python -m mini_entropy_srt.lightweight_train --alpha 0.3 --n_steps 500 --n_rollouts 8  # real run
 """
 
 import argparse
 import json
 import math
-import re
 from collections import Counter
 from pathlib import Path
 
 import pandas as pd
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
+from mini_entropy_srt import repo_utils
 
 
 def is_placeholder_label(gt):
@@ -86,36 +93,6 @@ def extract_prompt_text(prompt_field, tokenizer=None):
 
 
 # ---------------------------------------------------------------------------
-# Answer extraction (matches the repo's \boxed{} convention)
-# ---------------------------------------------------------------------------
-def extract_boxed_answer(text: str):
-    """Extract the content of the LAST \\boxed{...} in text. Returns None if absent."""
-    matches = list(re.finditer(r"\\boxed\{", text))
-    if not matches:
-        return None
-    start = matches[-1].end()
-    depth = 1
-    i = start
-    while i < len(text) and depth > 0:
-        if text[i] == "{":
-            depth += 1
-        elif text[i] == "}":
-            depth -= 1
-        i += 1
-    if depth != 0:
-        return None
-    return text[start : i - 1].strip()
-
-
-def answers_match(a: str, b: str) -> bool:
-    """Loose string-equality check on normalized answers."""
-    if a is None or b is None:
-        return False
-    norm = lambda s: s.strip().replace(" ", "").replace("$", "")
-    return norm(a) == norm(b)
-
-
-# ---------------------------------------------------------------------------
 # Reward: majority-vote + PER-ROLLOUT surprisal bonus (the validated design)
 # ---------------------------------------------------------------------------
 def compute_rewards(answers: list, ground_truth: str, alpha: float):
@@ -125,13 +102,25 @@ def compute_rewards(answers: list, ground_truth: str, alpha: float):
                   NOT used in the SRT training reward itself)
     alpha: entropy-bonus strength
 
-    Returns: (rewards, majority_answer, agreement, true_accuracy_this_batch)
+    Ground-truth comparisons use repo_utils.score_against_ground_truth (the real
+    SRT repo's math_verify-based checker), same as baselines.py/entropy_reward.py --
+    so e.g. \\boxed{0.5} and \\boxed{1/2} are correctly scored as equal, instead of a
+    naive string comparison undercounting correctness on differently-formatted
+    but equivalent answers.
+
+    Returns: (rewards, majority_answer, agreement, avg_rollout_accuracy, majority_correct)
+      avg_rollout_accuracy : fraction of ALL rollouts individually correct (paper's avg@k) --
+                             informational only, NOT the same thing as majority_correct.
+      majority_correct     : 1.0/0.0, whether the MAJORITY-VOTE answer itself matches
+                             ground truth -- this is what Day 1/2's reward_hack_gap
+                             (agreement - majority_vote_accuracy) is defined against;
+                             use THIS, not avg_rollout_accuracy, for that comparison.
     """
     n = len(answers)
     valid = [a for a in answers if a is not None]
     if not valid:
         # nothing parsed: zero reward everywhere, zero bonus
-        return [0.0] * n, None, 0.0, 0.0
+        return [0.0] * n, None, 0.0, 0.0, 0.0
 
     counts = Counter(valid)
     majority_answer, majority_count = counts.most_common(1)[0]
@@ -150,11 +139,16 @@ def compute_rewards(answers: list, ground_truth: str, alpha: float):
         majority_reward = 1.0 if a == majority_answer else 0.0
         surprisal = -math.log(max(probs[a], 1e-9))
         rewards.append(majority_reward + alpha * surprisal)
-        if ground_truth is not None and answers_match(a, ground_truth):
+        if ground_truth is not None and repo_utils.score_against_ground_truth("\\boxed{" + a + "}", ground_truth):
             true_correct += 1
 
-    true_accuracy = true_correct / n
-    return rewards, majority_answer, agreement, true_accuracy
+    avg_rollout_accuracy = true_correct / n
+    majority_correct = (
+        repo_utils.score_against_ground_truth("\\boxed{" + majority_answer + "}", ground_truth)
+        if ground_truth is not None
+        else 0.0
+    )
+    return rewards, majority_answer, agreement, avg_rollout_accuracy, majority_correct
 
 
 # ---------------------------------------------------------------------------
@@ -171,26 +165,31 @@ def rloo_advantages(rewards: torch.Tensor) -> torch.Tensor:
 # ---------------------------------------------------------------------------
 # Gradient invariance sanity check — run BEFORE any real training
 # ---------------------------------------------------------------------------
+PROBE_ALPHA = 0.1  # fixed, comfortably-sized -- deliberately independent of the
+# user's real --alpha. This check validates the REWARD/ADVANTAGE CODE is wired
+# correctly, not what the user intends to train with -- if it only ran when
+# --alpha happened to be nonzero, a baseline run (--alpha 0.0, the "plain SRT"
+# control condition) would never verify the bonus mechanism before you also
+# launch the paired --alpha>0 run, possibly days apart.
+
+
 def gradient_invariance_check(alpha: float):
     """
     Confirms the per-rollout bonus actually changes the RLOO advantages
     (i.e. the zero-gradient bug is NOT present). Uses a synthetic example
     mirroring idx 28 from the Day-2 analysis (majority wrong, one correct rare answer).
 
-    IMPORTANT: if the user's real training alpha is 0.0 (a deliberate baseline/
-    control run), there is nothing to check -- the bonus is intentionally off --
-    so we skip rather than raise a false failure.
+    Always runs using PROBE_ALPHA, regardless of the user's real --alpha (including
+    0.0) -- see PROBE_ALPHA's comment for why.
     """
-    if alpha == 0.0:
-        print("[gradient check] alpha=0.0 requested (baseline run, bonus intentionally "
-              "off) -- skipping invariance check, nothing to verify.\n")
-        return
+    print(f"[gradient check] real training alpha={alpha} "
+          f"(probe alpha={PROBE_ALPHA} used for this check, independent of the above)")
 
     answers = ["6", "6", "6", "6", "6", "3", "6", "9/2"]  # majority "6" is wrong; "3" is correct
     ground_truth = "3"
 
-    rewards_no_bonus, _, _, _ = compute_rewards(answers, ground_truth, alpha=0.0)
-    rewards_with_bonus, _, _, _ = compute_rewards(answers, ground_truth, alpha=alpha)
+    rewards_no_bonus, _, _, _, _ = compute_rewards(answers, ground_truth, alpha=0.0)
+    rewards_with_bonus, _, _, _, _ = compute_rewards(answers, ground_truth, alpha=PROBE_ALPHA)
 
     adv_no_bonus = rloo_advantages(torch.tensor(rewards_no_bonus))
     adv_with_bonus = rloo_advantages(torch.tensor(rewards_with_bonus))
@@ -201,7 +200,7 @@ def gradient_invariance_check(alpha: float):
     a1 = adv_with_bonus[idx_correct].item()
 
     print(f"[gradient check] advantage for rare-correct rollout: "
-          f"no-bonus={a0:.4f}  with-bonus(alpha={alpha})={a1:.4f}")
+          f"no-bonus={a0:.4f}  with-bonus(probe alpha={PROBE_ALPHA})={a1:.4f}")
     if math.isclose(a0, a1, abs_tol=1e-6):
         raise RuntimeError(
             "GRADIENT INVARIANCE CHECK FAILED: advantages identical with/without bonus. "
@@ -305,14 +304,14 @@ def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_ro
     texts, gen_outputs, n_truncated = generate_rollouts(
         model, tokenizer, prompt, n_rollouts, base_max_tokens, escalated_max_tokens
     )
-    answers = [extract_boxed_answer(t) for t in texts]
+    answers = [repo_utils.extract_boxed_answer(t) for t in texts]
 
     if debug:
         print(f"  [debug] ground_truth={ground_truth!r}  truncated_and_escalated={n_truncated}/{n_rollouts}")
         for i, (t, a) in enumerate(zip(texts, answers)):
             print(f"  [debug] rollout {i}: extracted={a!r} | raw_tail={t[-150:]!r}")
 
-    rewards, majority_answer, agreement, true_accuracy = compute_rewards(answers, ground_truth, alpha)
+    rewards, majority_answer, agreement, avg_rollout_accuracy, _ = compute_rewards(answers, ground_truth, alpha)
     train_acc_is_meaningful = not is_placeholder_label(ground_truth)
 
     advantages = rloo_advantages(torch.tensor(rewards, dtype=torch.float32, device=model.device))
@@ -336,7 +335,7 @@ def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_ro
     return {
         "loss": loss.item(),
         "agreement": agreement,
-        "true_accuracy": true_accuracy if train_acc_is_meaningful else None,
+        "true_accuracy": avg_rollout_accuracy if train_acc_is_meaningful else None,
         "entropy": mean_entropy,
     }
 
@@ -345,14 +344,18 @@ def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_ro
 # Held-out evaluation
 # ---------------------------------------------------------------------------
 def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, base_max_tokens, escalated_max_tokens):
+    """test_accuracy/agreement_gap use MAJORITY-VOTE correctness (majority_correct),
+    matching Day 1/2's reward_hack_gap = agreement - majority_vote_accuracy exactly --
+    NOT avg_rollout_accuracy (avg@k), which is a different, always-more-pessimistic
+    number the paper itself tracks as a separate plot (Fig 3 vs Fig 4)."""
     model.eval()
     accs, gaps, ents = [], [], []
     sample = test_df.sample(min(n_eval_questions, len(test_df)), random_state=42)
     for _, row in sample.iterrows():
         prompt = extract_prompt_text(row["prompt"], tokenizer=tokenizer)
         texts, _, _ = generate_rollouts(model, tokenizer, prompt, n_rollouts, base_max_tokens, escalated_max_tokens)
-        answers = [extract_boxed_answer(t) for t in texts]
-        _, majority_answer, agreement, true_accuracy = compute_rewards(
+        answers = [repo_utils.extract_boxed_answer(t) for t in texts]
+        _, majority_answer, agreement, _, majority_correct = compute_rewards(
             answers, extract_ground_truth(row), alpha=0.0
         )
         valid_answers = [a for a in answers if a is not None]
@@ -361,8 +364,8 @@ def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, base_max_t
             counts = Counter(valid_answers)
             total = len(valid_answers)
             entropy = -sum((c / total) * math.log(c / total) for c in counts.values())
-        accs.append(true_accuracy)
-        gaps.append(agreement - true_accuracy)
+        accs.append(majority_correct)
+        gaps.append(agreement - majority_correct)
         ents.append(entropy)
     model.train()
     return {
@@ -434,24 +437,40 @@ def main():
     train_df = pd.read_parquet(args.train_parquet)
     test_df = pd.read_parquet(args.test_parquet)
 
-    # Exclude Day-1 eval-set rows from training to avoid train/eval leakage
+    # Exclude Day-1 eval-set rows from training to avoid train/eval leakage.
     eval_path = Path(args.eval_indices_path)
     if eval_path.exists():
         with open(eval_path) as f:
             eval_data = json.load(f)
-        # eval_indices.json may store indices under various keys depending on how it
-        # was written on Day 1 -- check a few common shapes defensively.
-        eval_indices = (
-            eval_data.get("main_100")
-            or eval_data.get("eval_indices")
-            or eval_data.get("indices")
-            or []
-        )
+        # Verified against the real eval_indices.json on disk: the correct key is
+        # "main_100" (the full 100-question eval pool Day 1 carved out; pilot_20 is
+        # nested inside it, so excluding main_100 covers both).
+        eval_indices = eval_data.get("main_100", [])
+
+        # eval_indices.json's numbers are row positions in the ORIGINAL
+        # ftajwar/deduplicated_dapo_dataset, not necessarily in train_parquet --
+        # dapo_unlabeled/train.parquet doesn't exist yet (as of this audit), so
+        # whether positional exclusion is even valid depends entirely on how
+        # curate_and_export.py (not yet written) constructs it. Prefer an explicit
+        # index column if the export preserved one; else fall back to positional
+        # exclusion with a loud warning so this assumption isn't silently trusted.
+        index_col = next((c for c in ("original_dapo_idx", "dapo_idx", "source_idx") if c in train_df.columns), None)
         before = len(train_df)
-        train_df = train_df.reset_index(drop=True)
-        train_df = train_df.drop(index=[i for i in eval_indices if i < len(train_df)], errors="ignore")
-        print(f"Excluded {before - len(train_df)} Day-1 eval rows from training pool "
-              f"(loaded from {eval_path}).")
+        if index_col is not None:
+            train_df = train_df[~train_df[index_col].isin(eval_indices)].reset_index(drop=True)
+            print(f"Excluded {before - len(train_df)} Day-1 eval rows from training pool "
+                  f"via explicit '{index_col}' column (loaded from {eval_path}).")
+        else:
+            train_df = train_df.reset_index(drop=True)
+            train_df = train_df.drop(index=[i for i in eval_indices if i < len(train_df)], errors="ignore")
+            print(f"Excluded {before - len(train_df)} Day-1 eval rows from training pool "
+                  f"(loaded from {eval_path}).\n"
+                  f"WARNING: no explicit source-index column found on train_parquet -- this "
+                  f"exclusion assumed row POSITION in train_parquet matches the original "
+                  f"dataset index in eval_indices.json. If curate_and_export.py filters, "
+                  f"reorders, or subsets rows, this assumption is WRONG and this exclusion "
+                  f"is not actually leak-proof. Verify, or add one of "
+                  f"('original_dapo_idx', 'dapo_idx', 'source_idx') to the export.")
     else:
         print(f"WARNING: eval_indices_path not found at {eval_path} -- "
               f"could not exclude Day-1 eval rows. Proceeding with full train set "
