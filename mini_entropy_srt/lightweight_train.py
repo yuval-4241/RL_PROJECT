@@ -114,7 +114,16 @@ def gradient_invariance_check(alpha: float):
     Confirms the per-rollout bonus actually changes the RLOO advantages
     (i.e. the zero-gradient bug is NOT present). Uses a synthetic example
     mirroring idx 28 from the Day-2 analysis (majority wrong, one correct rare answer).
+
+    IMPORTANT: if the user's real training alpha is 0.0 (a deliberate baseline/
+    control run), there is nothing to check -- the bonus is intentionally off --
+    so we skip rather than raise a false failure.
     """
+    if alpha == 0.0:
+        print("[gradient check] alpha=0.0 requested (baseline run, bonus intentionally "
+              "off) -- skipping invariance check, nothing to verify.\n")
+        return
+
     answers = ["6", "6", "6", "6", "6", "3", "6", "9/2"]  # majority "6" is wrong; "3" is correct
     ground_truth = "3"
 
