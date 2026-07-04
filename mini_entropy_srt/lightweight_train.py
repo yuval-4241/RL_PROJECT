@@ -213,22 +213,63 @@ def gradient_invariance_check(alpha: float):
 # ---------------------------------------------------------------------------
 # Rollout generation (plain transformers .generate(), no vLLM)
 # ---------------------------------------------------------------------------
-def generate_rollouts(model, tokenizer, prompt: str, n_rollouts: int, max_new_tokens: int):
+def generate_rollouts(model, tokenizer, prompt: str, n_rollouts: int,
+                       base_max_tokens: int = 2048, escalated_max_tokens: int = 4096):
+    """
+    Generate n_rollouts completions. Uses base_max_tokens by default; any rollout that
+    gets cut off (no EOS token reached, i.e. truncated mid-generation) is automatically
+    regenerated ONCE at escalated_max_tokens. This matches the Day-1/2 pilot's escalation
+    policy: default 2048, escalate to 4096 only when truncated.
+    """
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    prompt_len = inputs["input_ids"].shape[1]
+
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_new_tokens=max_new_tokens,
+            max_new_tokens=base_max_tokens,
             do_sample=True,
             temperature=1.0,
             num_return_sequences=n_rollouts,
             pad_token_id=tokenizer.eos_token_id,
         )
-    prompt_len = inputs["input_ids"].shape[1]
+
+    # Detect truncation: a rollout is truncated if it never produced the EOS token
+    # within the generated span (i.e. it used the full budget without stopping naturally).
+    eos_id = tokenizer.eos_token_id
+    truncated_mask = []
+    for seq in outputs:
+        gen_part = seq[prompt_len:]
+        truncated_mask.append(eos_id not in gen_part.tolist())
+
+    n_truncated = sum(truncated_mask)
+    if n_truncated > 0:
+        # Re-generate ONLY the truncated rollouts at the escalated budget
+        with torch.no_grad():
+            escalated_outputs = model.generate(
+                **inputs,
+                max_new_tokens=escalated_max_tokens,
+                do_sample=True,
+                temperature=1.0,
+                num_return_sequences=n_truncated,
+                pad_token_id=tokenizer.eos_token_id,
+            )
+        # Splice escalated results back into the positions that were truncated
+        esc_iter = iter(escalated_outputs)
+        max_len = max(outputs.shape[1], escalated_outputs.shape[1])
+        padded = torch.full((outputs.shape[0], max_len), tokenizer.pad_token_id,
+                             dtype=outputs.dtype, device=outputs.device)
+        padded[:, :outputs.shape[1]] = outputs
+        for i, was_truncated in enumerate(truncated_mask):
+            if was_truncated:
+                esc_seq = next(esc_iter)
+                padded[i, :esc_seq.shape[0]] = esc_seq
+        outputs = padded
+
     texts = [
         tokenizer.decode(seq[prompt_len:], skip_special_tokens=True) for seq in outputs
     ]
-    return texts, outputs  # outputs includes prompt+completion token ids
+    return texts, outputs, n_truncated
 
 
 def compute_sequence_logprobs(model, tokenizer, sequences: torch.Tensor, prompt_len: int):
@@ -259,12 +300,15 @@ def compute_sequence_logprobs(model, tokenizer, sequences: torch.Tensor, prompt_
 # ---------------------------------------------------------------------------
 # One training step: generate -> reward -> advantage -> policy-gradient update
 # ---------------------------------------------------------------------------
-def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_rollouts, max_new_tokens, debug=False):
-    texts, gen_outputs = generate_rollouts(model, tokenizer, prompt, n_rollouts, max_new_tokens)
+def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_rollouts,
+                   base_max_tokens, escalated_max_tokens, debug=False):
+    texts, gen_outputs, n_truncated = generate_rollouts(
+        model, tokenizer, prompt, n_rollouts, base_max_tokens, escalated_max_tokens
+    )
     answers = [extract_boxed_answer(t) for t in texts]
 
     if debug:
-        print(f"  [debug] ground_truth={ground_truth!r}")
+        print(f"  [debug] ground_truth={ground_truth!r}  truncated_and_escalated={n_truncated}/{n_rollouts}")
         for i, (t, a) in enumerate(zip(texts, answers)):
             print(f"  [debug] rollout {i}: extracted={a!r} | raw_tail={t[-150:]!r}")
 
@@ -300,13 +344,13 @@ def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_ro
 # ---------------------------------------------------------------------------
 # Held-out evaluation
 # ---------------------------------------------------------------------------
-def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, max_new_tokens):
+def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, base_max_tokens, escalated_max_tokens):
     model.eval()
     accs, gaps, ents = [], [], []
     sample = test_df.sample(min(n_eval_questions, len(test_df)), random_state=42)
     for _, row in sample.iterrows():
         prompt = extract_prompt_text(row["prompt"], tokenizer=tokenizer)
-        texts, _ = generate_rollouts(model, tokenizer, prompt, n_rollouts, max_new_tokens)
+        texts, _, _ = generate_rollouts(model, tokenizer, prompt, n_rollouts, base_max_tokens, escalated_max_tokens)
         answers = [extract_boxed_answer(t) for t in texts]
         _, majority_answer, agreement, true_accuracy = compute_rewards(
             answers, extract_ground_truth(row), alpha=0.0
@@ -341,7 +385,11 @@ def main():
     parser.add_argument("--alpha", type=float, default=0.0)
     parser.add_argument("--n_steps", type=int, default=20)
     parser.add_argument("--n_rollouts", type=int, default=4)
-    parser.add_argument("--max_new_tokens", type=int, default=512)
+    parser.add_argument("--base_max_tokens", type=int, default=2048,
+                         help="Default generation token budget (Day-1/2 convention).")
+    parser.add_argument("--escalated_max_tokens", type=int, default=4096,
+                         help="Token budget used to auto-retry ONLY the rollouts that "
+                              "got truncated at base_max_tokens (Day-1/2 convention).")
     parser.add_argument("--lr", type=float, default=1e-6)
     parser.add_argument("--eval_every", type=int, default=10)
     parser.add_argument("--n_eval_questions", type=int, default=10)
@@ -361,6 +409,10 @@ def main():
     _random.seed(args.seed)
     import numpy as _np
     _np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
+    print(f"Seed set to {args.seed} (matches Day-1 pilot convention: seed=42, "
+          f"reproducible sampling).")
 
     print(f"=== Lightweight RLOO training: alpha={args.alpha}, n_steps={args.n_steps} ===\n")
 
@@ -416,7 +468,7 @@ def main():
 
         step_stats = training_step(
             model, tokenizer, optimizer, prompt, ground_truth,
-            args.alpha, args.n_rollouts, args.max_new_tokens,
+            args.alpha, args.n_rollouts, args.base_max_tokens, args.escalated_max_tokens,
             debug=(step < args.debug_steps),
         )
         acc_str = f"{step_stats['true_accuracy']:.3f}" if step_stats['true_accuracy'] is not None else "N/A (unlabeled)"
@@ -430,7 +482,7 @@ def main():
         if step % args.eval_every == 0:
             eval_stats = evaluate(
                 model, tokenizer, test_df, args.n_eval_questions,
-                args.n_rollouts, args.max_new_tokens,
+                args.n_rollouts, args.base_max_tokens, args.escalated_max_tokens,
             )
             record.update(eval_stats)
             print(f"  [eval] test_acc={eval_stats['test_accuracy']:.3f} "
