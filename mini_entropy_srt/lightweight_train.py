@@ -23,6 +23,57 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
+def extract_ground_truth(row):
+    """
+    DAPO's parquet does NOT have a plain 'answer' or 'ground_truth' column.
+    The true answer lives inside the 'reward_model' struct, typically as
+    reward_model['ground_truth']. Handle numpy/dict wrapping defensively.
+    """
+    rm = row.get("reward_model", None)
+    if rm is None:
+        return None
+    if hasattr(rm, "item"):
+        try:
+            rm = rm.item()
+        except Exception:
+            pass
+    if isinstance(rm, dict):
+        return rm.get("ground_truth", None)
+    return None
+
+
+def extract_prompt_text(prompt_field, tokenizer=None):
+    """
+    DAPO's parquet stores 'prompt' as a numpy array containing one dict:
+        array([{'role': 'user', 'content': '...'}], dtype=object)
+    Extract the content string, and apply the tokenizer's chat template if available
+    so the model sees properly formatted instruction-following input.
+    """
+    # Unwrap numpy array / list wrapper
+    if hasattr(prompt_field, "tolist"):
+        prompt_field = prompt_field.tolist()
+    if isinstance(prompt_field, (list, tuple)) and len(prompt_field) > 0:
+        messages = prompt_field
+    elif isinstance(prompt_field, dict):
+        messages = [prompt_field]
+    elif isinstance(prompt_field, str):
+        return prompt_field
+    else:
+        return str(prompt_field)
+
+    if tokenizer is not None and hasattr(tokenizer, "apply_chat_template"):
+        try:
+            return tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+        except Exception:
+            pass  # fall through to plain content extraction below
+
+    # Fallback: just grab the content string(s)
+    parts = [m.get("content", "") for m in messages if isinstance(m, dict)]
+    return "\n".join(parts) if parts else str(prompt_field)
+
+
 # ---------------------------------------------------------------------------
 # Answer extraction (matches the repo's \boxed{} convention)
 # ---------------------------------------------------------------------------
@@ -227,10 +278,11 @@ def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, max_new_to
     accs, gaps, ents = [], [], []
     sample = test_df.sample(min(n_eval_questions, len(test_df)))
     for _, row in sample.iterrows():
-        texts, _ = generate_rollouts(model, tokenizer, row["prompt"], n_rollouts, max_new_tokens)
+        prompt = extract_prompt_text(row["prompt"], tokenizer=tokenizer)
+        texts, _ = generate_rollouts(model, tokenizer, prompt, n_rollouts, max_new_tokens)
         answers = [extract_boxed_answer(t) for t in texts]
         _, majority_answer, agreement, true_accuracy = compute_rewards(
-            answers, row.get("answer", row.get("ground_truth")), alpha=0.0
+            answers, extract_ground_truth(row), alpha=0.0
         )
         valid_answers = [a for a in answers if a is not None]
         entropy = 0.0
@@ -287,16 +339,13 @@ def main():
     train_df = pd.read_parquet(args.train_parquet)
     test_df = pd.read_parquet(args.test_parquet)
     prompt_col = "prompt" if "prompt" in train_df.columns else train_df.columns[0]
-    answer_col = "answer" if "answer" in train_df.columns else (
-        "ground_truth" if "ground_truth" in train_df.columns else None
-    )
     print(f"Train rows: {len(train_df)}, Test rows: {len(test_df)}")
 
     history = []
     for step in range(args.n_steps):
         row = train_df.sample(1).iloc[0]
-        prompt = row[prompt_col]
-        ground_truth = row[answer_col] if answer_col else None
+        prompt = extract_prompt_text(row[prompt_col], tokenizer=tokenizer)
+        ground_truth = extract_ground_truth(row)
 
         step_stats = training_step(
             model, tokenizer, optimizer, prompt, ground_truth,
