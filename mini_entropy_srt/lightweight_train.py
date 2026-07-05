@@ -228,7 +228,18 @@ def generate_rollouts(model, tokenizer, prompt: str, n_rollouts: int,
     gets cut off (no EOS token reached, i.e. truncated mid-generation) is automatically
     regenerated ONCE at escalated_max_tokens. This matches the Day-1/2 pilot's escalation
     policy: default 2048, escalate to 4096 only when truncated.
+
+    Gradient checkpointing (needed for the TRAINING forward pass) forces
+    use_cache=False inside .generate(), which disables KV-caching and makes
+    autoregressive generation reprocess the whole sequence for every new token --
+    dramatically slower, especially on older GPUs with weak fp16 throughput
+    (e.g. Pascal/1080 Ti, no Tensor Cores). Generation does no backprop, so
+    checkpointing buys nothing here -- disabled for generation, restored after.
     """
+    was_checkpointing = model.is_gradient_checkpointing
+    if was_checkpointing:
+        model.gradient_checkpointing_disable()
+
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
     prompt_len = inputs["input_ids"].shape[1]
 
@@ -240,6 +251,7 @@ def generate_rollouts(model, tokenizer, prompt: str, n_rollouts: int,
             temperature=1.0,
             num_return_sequences=n_rollouts,
             pad_token_id=tokenizer.eos_token_id,
+            use_cache=True,
         )
 
     # Detect truncation: a rollout is truncated if it never produced the EOS token
@@ -261,6 +273,7 @@ def generate_rollouts(model, tokenizer, prompt: str, n_rollouts: int,
                 temperature=1.0,
                 num_return_sequences=n_truncated,
                 pad_token_id=tokenizer.eos_token_id,
+                use_cache=True,
             )
         # Splice escalated results back into the positions that were truncated
         esc_iter = iter(escalated_outputs)
@@ -273,6 +286,9 @@ def generate_rollouts(model, tokenizer, prompt: str, n_rollouts: int,
                 esc_seq = next(esc_iter)
                 padded[i, :esc_seq.shape[0]] = esc_seq
         outputs = padded
+
+    if was_checkpointing:
+        model.gradient_checkpointing_enable()  # restore for the training forward pass
 
     texts = [
         tokenizer.decode(seq[prompt_len:], skip_special_tokens=True) for seq in outputs
