@@ -342,11 +342,23 @@ def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_ro
     advantages = rloo_advantages(torch.tensor(rewards, dtype=torch.float32, device=model.device))
 
     prompt_len = tokenizer(prompt, return_tensors="pt")["input_ids"].shape[1]
-    log_probs = compute_sequence_logprobs(model, tokenizer, gen_outputs, prompt_len)
 
-    loss = -(advantages.detach() * log_probs).mean()
+    # Forward+backward ONE ROLLOUT AT A TIME rather than batched together. Qwen2's own
+    # forward() upcasts the full per-position logits to fp32 (logits = logits.float(),
+    # baked into the model, not something we control) -- that tensor scales with
+    # batch_size x seq_len x vocab_size, and this vocab is ~150k. Batching all rollouts
+    # together OOM'd on longer (escalated) sequences. Gradients are additive, so
+    # accumulating per-rollout .backward() calls before one optimizer.step() gives the
+    # mathematically identical result to the batched version -- just n_rollouts separate
+    # smaller forward passes instead of one big one.
     optimizer.zero_grad()
-    loss.backward()
+    total_loss = 0.0
+    n = len(gen_outputs)
+    for i in range(n):
+        log_prob_i = compute_sequence_logprobs(model, tokenizer, gen_outputs[i : i + 1], prompt_len)
+        loss_i = -(advantages[i].detach() * log_prob_i).mean() / n
+        loss_i.backward()
+        total_loss += loss_i.item()
     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
     optimizer.step()
 
