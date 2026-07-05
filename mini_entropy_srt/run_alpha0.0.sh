@@ -1,10 +1,12 @@
 #!/bin/bash
 
 #SBATCH --partition main
-#SBATCH --time 0-10:00:00
+#SBATCH --time 0-08:00:00
 #SBATCH --job-name srt_alpha0.0
 #SBATCH --output job-%J.out
 #SBATCH --gpus=1
+#SBATCH --mail-user=yuvalzoh@post.bgu.ac.il
+#SBATCH --mail-type=ALL
 
 ### Print some data to output file ###
 echo `date`
