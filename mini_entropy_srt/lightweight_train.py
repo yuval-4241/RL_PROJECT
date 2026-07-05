@@ -350,6 +350,12 @@ def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_ro
     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
     optimizer.step()
 
+    # Release cached-but-unused CUDA memory. On a tight 11GB GPU with a long
+    # multi-day run ahead, fragmentation compounds step over step even when
+    # each individual step would otherwise fit -- this is what caused the OOM
+    # inside generate()'s prefill forward pass on a later step.
+    torch.cuda.empty_cache()
+
     mean_entropy = 0.0
     valid_answers = [a for a in answers if a is not None]
     if valid_answers:
@@ -392,6 +398,7 @@ def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, base_max_t
         accs.append(majority_correct)
         gaps.append(agreement - majority_correct)
         ents.append(entropy)
+        torch.cuda.empty_cache()  # same fragmentation mitigation as training_step
     model.train()
     return {
         "test_accuracy": sum(accs) / len(accs) if accs else 0.0,
