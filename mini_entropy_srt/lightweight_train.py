@@ -376,7 +376,7 @@ def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_ro
         mean_entropy = -sum((c / total) * math.log(c / total) for c in counts.values())
 
     return {
-        "loss": loss.item(),
+        "loss": total_loss,
         "agreement": agreement,
         "true_accuracy": avg_rollout_accuracy if train_acc_is_meaningful else None,
         "entropy": mean_entropy,
