@@ -19,9 +19,19 @@ Usage (both work -- see the sys.path bootstrap below for why):
 import argparse
 import json
 import math
+import os
 import sys
 from collections import Counter
 from pathlib import Path
+
+# Must be set BEFORE `import torch` -- the CUDA allocator reads this env var once,
+# at torch's own import/first-CUDA-init time. Reduces OOMs caused by allocator
+# fragmentation (a contiguous block not found even though enough total free memory
+# exists) rather than genuinely insufficient memory -- previously only set when
+# launching via run_smoke_test.sh, so it silently didn't apply when running this
+# script directly. setdefault() so an explicitly-exported value from the shell
+# still wins.
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 import pandas as pd
 import torch
@@ -304,7 +314,7 @@ def generate_rollouts(model, tokenizer, prompt: str, n_rollouts: int,
 # (~4096 tokens) x ~150k vocab x 4 bytes, that single tensor is ~2.5GB, enough to OOM
 # an 11GB GPU once the model + SGD momentum state are also resident. Chunking bounds
 # that tensor's size to LOGIT_CHUNK_SIZE regardless of total sequence length.
-LOGIT_CHUNK_SIZE = 1024
+LOGIT_CHUNK_SIZE = 512
 
 
 def _chunk_logprob_fn(lm_head, hidden_chunk, target_chunk):
