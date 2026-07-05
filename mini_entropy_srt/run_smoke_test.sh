@@ -23,7 +23,7 @@ LOG_FILE="logs/smoke_test_$(date +%Y%m%d_%H%M%S).log"
 # fails to find a contiguous block.
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-nohup python -m mini_entropy_srt.lightweight_train \
+nohup python -u -m mini_entropy_srt.lightweight_train \
     --n_steps 3 \
     --n_rollouts 2 \
     --base_max_tokens 256 \
