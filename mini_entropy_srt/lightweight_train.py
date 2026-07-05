@@ -25,6 +25,7 @@ from pathlib import Path
 
 import pandas as pd
 import torch
+import torch.utils.checkpoint as torch_checkpoint
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Makes `from mini_entropy_srt import repo_utils` resolve even when this file is run
@@ -296,9 +297,34 @@ def generate_rollouts(model, tokenizer, prompt: str, n_rollouts: int,
     return texts, outputs, n_truncated
 
 
+# Tokens per chunk when computing the vocab-projection + log-softmax inside
+# compute_sequence_logprobs. HF's built-in ForCausalLM.forward() computes this over
+# the FULL sequence length in one shot and unconditionally upcasts to fp32 (baked into
+# Qwen2's own code, not something we control) -- at escalated sequence lengths
+# (~4096 tokens) x ~150k vocab x 4 bytes, that single tensor is ~2.5GB, enough to OOM
+# an 11GB GPU once the model + SGD momentum state are also resident. Chunking bounds
+# that tensor's size to LOGIT_CHUNK_SIZE regardless of total sequence length.
+LOGIT_CHUNK_SIZE = 1024
+
+
+def _chunk_logprob_fn(lm_head, hidden_chunk, target_chunk):
+    logits_chunk = lm_head(hidden_chunk).float()
+    log_probs_chunk = torch.log_softmax(logits_chunk, dim=-1)
+    return log_probs_chunk.gather(2, target_chunk.unsqueeze(-1)).squeeze(-1)
+
+
 def compute_sequence_logprobs(model, tokenizer, sequences: torch.Tensor, prompt_len: int):
     """Forward pass WITH gradients on the already-generated sequences; sum log-probs
     of the generated (post-prompt) tokens only.
+
+    Runs the transformer body once (its own gradient checkpointing applies exactly as
+    before), then applies the vocab projection (lm_head) + log-softmax in
+    LOGIT_CHUNK_SIZE-token chunks via torch.utils.checkpoint, instead of materializing
+    the full (seq_len x vocab_size) logits tensor at once. Each chunk's logits are
+    discarded immediately after computing its log-probs and only recomputed (cheaply --
+    just lm_head + softmax, not the whole transformer body) if/when the eventual single
+    .backward() call reaches that chunk. Mathematically identical to the non-chunked
+    version; only peak memory differs.
 
     IMPORTANT: sequences come from model.generate() under torch.no_grad(), so they are
     plain integer token ids with no grad history attached (which is correct -- you can't
@@ -309,15 +335,35 @@ def compute_sequence_logprobs(model, tokenizer, sequences: torch.Tensor, prompt_
     model.train()
     sequences = sequences.detach()  # ensure no stale graph from generation is attached
     attention_mask = (sequences != tokenizer.pad_token_id).long()
-    outputs = model(input_ids=sequences, attention_mask=attention_mask, use_cache=False)
-    logits = outputs.logits[:, :-1, :]  # predict token t+1 from position t
+
+    hidden_states = model.model(
+        input_ids=sequences, attention_mask=attention_mask, use_cache=False
+    ).last_hidden_state
+    hidden_states = hidden_states[:, :-1, :]  # predict token t+1 from position t
     targets = sequences[:, 1:]
-    log_probs_all = torch.log_softmax(logits, dim=-1)
-    token_log_probs = log_probs_all.gather(2, targets.unsqueeze(-1)).squeeze(-1)
-    # only sum over the GENERATED portion (after the prompt)
-    gen_mask = torch.zeros_like(targets, dtype=torch.bool)
-    gen_mask[:, prompt_len - 1 :] = True
-    seq_log_probs = (token_log_probs * gen_mask).sum(dim=1)
+
+    seq_len = hidden_states.shape[1]
+    gen_mask = torch.zeros(seq_len, dtype=torch.bool, device=sequences.device)
+    gen_mask[prompt_len - 1 :] = True  # only the GENERATED portion (after the prompt)
+
+    chunk_sums = []
+    for start in range(0, seq_len, LOGIT_CHUNK_SIZE):
+        end = min(start + LOGIT_CHUNK_SIZE, seq_len)
+        if not gen_mask[start:end].any():
+            continue  # pure-prompt chunk contributes nothing -- skip its lm_head pass entirely
+        chunk_log_probs = torch_checkpoint.checkpoint(
+            _chunk_logprob_fn,
+            model.lm_head,
+            hidden_states[:, start:end, :],
+            targets[:, start:end],
+            use_reentrant=False,
+        )
+        chunk_mask = gen_mask[start:end].unsqueeze(0)
+        chunk_sums.append((chunk_log_probs * chunk_mask).sum(dim=1))
+
+    if not chunk_sums:
+        return torch.zeros(sequences.shape[0], device=sequences.device)
+    seq_log_probs = torch.stack(chunk_sums, dim=0).sum(dim=0)
     return seq_log_probs
 
 
