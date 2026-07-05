@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --partition main
-#SBATCH --time 0-08:00:00
+#SBATCH --time 0-14:00:00
 #SBATCH --job-name srt_alpha0.3
 #SBATCH --output job-%J.out
 #SBATCH --gpus=1
