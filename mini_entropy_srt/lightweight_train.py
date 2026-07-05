@@ -448,16 +448,26 @@ def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, base_max_t
     """test_accuracy/agreement_gap use MAJORITY-VOTE correctness (majority_correct),
     matching Day 1/2's reward_hack_gap = agreement - majority_vote_accuracy exactly --
     NOT avg_rollout_accuracy (avg@k), which is a different, always-more-pessimistic
-    number the paper itself tracks as a separate plot (Fig 3 vs Fig 4)."""
+    number the paper itself tracks as a separate plot (Fig 3 vs Fig 4).
+
+    zero_shot_accuracy: rollout 0 alone, scored on its own -- a valid single-shot sample
+    (same temperature/distribution as every other rollout, no extra generation needed),
+    used to compare against majority_vote accuracy (the generation-verification gap)."""
     model.eval()
-    accs, gaps, ents = [], [], []
+    accs, gaps, ents, zero_shot_accs = [], [], [], []
     sample = test_df.sample(min(n_eval_questions, len(test_df)), random_state=42)
     for _, row in sample.iterrows():
         prompt = extract_prompt_text(row["prompt"], tokenizer=tokenizer)
         texts, _, _ = generate_rollouts(model, tokenizer, prompt, n_rollouts, base_max_tokens, escalated_max_tokens)
         answers = [repo_utils.extract_boxed_answer(t) for t in texts]
+        ground_truth = extract_ground_truth(row)
         _, majority_answer, agreement, _, majority_correct = compute_rewards(
-            answers, extract_ground_truth(row), alpha=0.0
+            answers, ground_truth, alpha=0.0
+        )
+        zero_shot_correct = (
+            repo_utils.score_against_ground_truth("\\boxed{" + answers[0] + "}", ground_truth)
+            if answers[0] is not None and ground_truth is not None
+            else 0.0
         )
         valid_answers = [a for a in answers if a is not None]
         entropy = 0.0
@@ -468,12 +478,14 @@ def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, base_max_t
         accs.append(majority_correct)
         gaps.append(agreement - majority_correct)
         ents.append(entropy)
+        zero_shot_accs.append(zero_shot_correct)
         torch.cuda.empty_cache()  # same fragmentation mitigation as training_step
     model.train()
     return {
         "test_accuracy": sum(accs) / len(accs) if accs else 0.0,
         "agreement_gap": sum(gaps) / len(gaps) if gaps else 0.0,
         "mean_entropy": sum(ents) / len(ents) if ents else 0.0,
+        "zero_shot_accuracy": sum(zero_shot_accs) / len(zero_shot_accs) if zero_shot_accs else 0.0,
     }
 
 
@@ -581,6 +593,22 @@ def main():
     prompt_col = "prompt" if "prompt" in train_df.columns else train_df.columns[0]
     print(f"Train rows (after exclusion): {len(train_df)}, Test rows: {len(test_df)}")
 
+    # Genuine pre-training baseline: evaluated BEFORE any optimizer.step() has touched
+    # the weights, unlike the step-0 eval below (which already reflects one gradient
+    # update). This is the "frozen model" reference point -- compare zero_shot_accuracy
+    # vs test_accuracy here to see the raw generation-verification gap, and compare
+    # this test_accuracy against the run's LAST eval to see whether training actually
+    # helped or hurt.
+    print("Running pre-training baseline eval (frozen weights, before any training step)...")
+    pretrain_eval = evaluate(
+        model, tokenizer, test_df, args.n_eval_questions,
+        args.n_rollouts, args.base_max_tokens, args.escalated_max_tokens,
+    )
+    print(f"  [pretrain] zero_shot_acc={pretrain_eval['zero_shot_accuracy']:.3f} "
+          f"majority_acc={pretrain_eval['test_accuracy']:.3f} "
+          f"gap={pretrain_eval['agreement_gap']:.3f} "
+          f"entropy={pretrain_eval['mean_entropy']:.3f}\n")
+
     history = []
     for step in range(args.n_steps):
         row = train_df.sample(1, random_state=args.seed + step).iloc[0]
@@ -606,7 +634,8 @@ def main():
                 args.n_rollouts, args.base_max_tokens, args.escalated_max_tokens,
             )
             record.update(eval_stats)
-            print(f"  [eval] test_acc={eval_stats['test_accuracy']:.3f} "
+            print(f"  [eval] zero_shot_acc={eval_stats['zero_shot_accuracy']:.3f} "
+                  f"majority_acc={eval_stats['test_accuracy']:.3f} "
                   f"gap={eval_stats['agreement_gap']:.3f} "
                   f"entropy={eval_stats['mean_entropy']:.3f}")
 
@@ -615,7 +644,7 @@ def main():
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:
-        json.dump({"args": vars(args), "history": history}, f, indent=2)
+        json.dump({"args": vars(args), "pretrain_eval": pretrain_eval, "history": history}, f, indent=2)
     print(f"\nSaved results to {out_path}")
 
 
