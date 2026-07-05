@@ -235,10 +235,22 @@ def gradient_invariance_check(alpha: float):
 def generate_rollouts(model, tokenizer, prompt: str, n_rollouts: int,
                        base_max_tokens: int = 2048, escalated_max_tokens: int = 4096):
     """
-    Generate n_rollouts completions. Uses base_max_tokens by default; any rollout that
-    gets cut off (no EOS token reached, i.e. truncated mid-generation) is automatically
-    regenerated ONCE at escalated_max_tokens. This matches the Day-1/2 pilot's escalation
-    policy: default 2048, escalate to 4096 only when truncated.
+    Generate n_rollouts completions, ONE AT A TIME (num_return_sequences=1 per call)
+    rather than batching all n_rollouts into a single .generate() call. HF's .generate()
+    runs a normal forward pass over the full prompt for its first ("prefill") step, and
+    that forward pass ALSO unconditionally upcasts its logits to fp32 (same underlying
+    behavior as the training forward pass, just inside a different code path) --
+    batching n_rollouts copies of the prompt together multiplies that tensor by
+    n_rollouts, which can OOM for long-enough prompts even though generation itself
+    runs under torch.no_grad() (no backward buffers needed, but the forward-pass peak
+    is still real). Processing one rollout at a time bounds that peak to a single
+    prompt's prefill, independent of n_rollouts -- same principle already applied to
+    the training forward/backward pass in training_step().
+
+    Uses base_max_tokens by default; any rollout that gets cut off (no EOS token
+    reached, i.e. truncated mid-generation) is automatically regenerated ONCE at
+    escalated_max_tokens. This matches the Day-1/2 pilot's escalation policy: default
+    2048, escalate to 4096 only when truncated.
 
     Gradient checkpointing (needed for the TRAINING forward pass) forces
     use_cache=False inside .generate(), which disables KV-caching and makes
@@ -253,53 +265,54 @@ def generate_rollouts(model, tokenizer, prompt: str, n_rollouts: int,
 
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
     prompt_len = inputs["input_ids"].shape[1]
-
-    with torch.no_grad():
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=base_max_tokens,
-            do_sample=True,
-            temperature=1.0,
-            num_return_sequences=n_rollouts,
-            pad_token_id=tokenizer.eos_token_id,
-            use_cache=True,
-        )
-
-    # Detect truncation: a rollout is truncated if it never produced the EOS token
-    # within the generated span (i.e. it used the full budget without stopping naturally).
     eos_id = tokenizer.eos_token_id
-    truncated_mask = []
-    for seq in outputs:
-        gen_part = seq[prompt_len:]
-        truncated_mask.append(eos_id not in gen_part.tolist())
 
-    n_truncated = sum(truncated_mask)
-    if n_truncated > 0:
-        # Re-generate ONLY the truncated rollouts at the escalated budget
+    all_outputs = []
+    for _ in range(n_rollouts):
         with torch.no_grad():
-            escalated_outputs = model.generate(
+            out = model.generate(
                 **inputs,
-                max_new_tokens=escalated_max_tokens,
+                max_new_tokens=base_max_tokens,
                 do_sample=True,
                 temperature=1.0,
-                num_return_sequences=n_truncated,
+                num_return_sequences=1,
                 pad_token_id=tokenizer.eos_token_id,
                 use_cache=True,
             )
-        # Splice escalated results back into the positions that were truncated
-        esc_iter = iter(escalated_outputs)
-        max_len = max(outputs.shape[1], escalated_outputs.shape[1])
-        padded = torch.full((outputs.shape[0], max_len), tokenizer.pad_token_id,
-                             dtype=outputs.dtype, device=outputs.device)
-        padded[:, :outputs.shape[1]] = outputs
+        all_outputs.append(out[0])
+        torch.cuda.empty_cache()
+
+    # Detect truncation: a rollout is truncated if it never produced the EOS token
+    # within the generated span (i.e. it used the full budget without stopping naturally).
+    truncated_mask = [eos_id not in seq[prompt_len:].tolist() for seq in all_outputs]
+    n_truncated = sum(truncated_mask)
+
+    if n_truncated > 0:
+        # Re-generate ONLY the truncated rollouts, one at a time, at the escalated budget
         for i, was_truncated in enumerate(truncated_mask):
-            if was_truncated:
-                esc_seq = next(esc_iter)
-                padded[i, :esc_seq.shape[0]] = esc_seq
-        outputs = padded
+            if not was_truncated:
+                continue
+            with torch.no_grad():
+                esc_out = model.generate(
+                    **inputs,
+                    max_new_tokens=escalated_max_tokens,
+                    do_sample=True,
+                    temperature=1.0,
+                    num_return_sequences=1,
+                    pad_token_id=tokenizer.eos_token_id,
+                    use_cache=True,
+                )
+            all_outputs[i] = esc_out[0]
+            torch.cuda.empty_cache()
 
     if was_checkpointing:
         model.gradient_checkpointing_enable()  # restore for the training forward pass
+
+    max_len = max(o.shape[0] for o in all_outputs)
+    outputs = torch.full((n_rollouts, max_len), tokenizer.pad_token_id,
+                          dtype=all_outputs[0].dtype, device=all_outputs[0].device)
+    for i, o in enumerate(all_outputs):
+        outputs[i, : o.shape[0]] = o
 
     texts = [
         tokenizer.decode(seq[prompt_len:], skip_special_tokens=True) for seq in outputs
@@ -609,6 +622,17 @@ def main():
           f"gap={pretrain_eval['agreement_gap']:.3f} "
           f"entropy={pretrain_eval['mean_entropy']:.3f}\n")
 
+    out_path = Path(args.output)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def save_progress():
+        # Called after EVERY step, not just at the end -- a long run that crashes
+        # (OOM, node preemption, etc.) partway through previously lost ALL completed
+        # steps, since the only json.dump() call was after the full loop. Overwrites
+        # the same file each time, so this is always the latest complete state.
+        with open(out_path, "w") as f:
+            json.dump({"args": vars(args), "pretrain_eval": pretrain_eval, "history": history}, f, indent=2)
+
     history = []
     for step in range(args.n_steps):
         row = train_df.sample(1, random_state=args.seed + step).iloc[0]
@@ -640,11 +664,8 @@ def main():
                   f"entropy={eval_stats['mean_entropy']:.3f}")
 
         history.append(record)
+        save_progress()
 
-    out_path = Path(args.output)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w") as f:
-        json.dump({"args": vars(args), "pretrain_eval": pretrain_eval, "history": history}, f, indent=2)
     print(f"\nSaved results to {out_path}")
 
 
