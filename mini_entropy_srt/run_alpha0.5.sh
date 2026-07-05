@@ -1,6 +1,7 @@
 #!/bin/bash
 
-#SBATCH --partition main
+#SBATCH --partition course
+#SBATCH --qos course
 #SBATCH --time 0-14:00:00
 #SBATCH --job-name srt_alpha0.5
 #SBATCH --output job-%J.out
