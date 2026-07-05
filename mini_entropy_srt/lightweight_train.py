@@ -359,6 +359,8 @@ def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_ro
         loss_i = -(advantages[i].detach() * log_prob_i).mean() / n
         loss_i.backward()
         total_loss += loss_i.item()
+        del log_prob_i, loss_i
+        torch.cuda.empty_cache()
     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
     optimizer.step()
 
