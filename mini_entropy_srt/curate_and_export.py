@@ -29,16 +29,15 @@ Run with: python -m mini_entropy_srt.curate_and_export --n_train 300
 """
 import argparse
 import json
-import sys
 from pathlib import Path
 
 import pandas as pd
 
-_PARENT_DIR = Path(__file__).resolve().parent.parent
-if str(_PARENT_DIR) not in sys.path:
-    sys.path.insert(0, str(_PARENT_DIR))
-
-from mini_entropy_srt.baselines import INDICES_FILE, SEED
+# Inlined rather than imported from baselines.py: that module also pulls in
+# matplotlib (for its plotting), which isn't installed in every training
+# environment (e.g. the GPU cluster's yuval_rl env) and isn't needed here.
+SEED = 42
+INDICES_FILE = Path(__file__).resolve().parent / "data" / "eval_indices.json"
 
 
 def main():
