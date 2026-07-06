@@ -80,6 +80,27 @@ def extract_ground_truth(row):
     return None
 
 
+def extract_oracle_ground_truth(row):
+    """
+    For --oracle mode ONLY: reads the REAL answer, hidden at
+    reward_model['solution_hidden_during_training'] -- kept deliberately separate from
+    reward_model['ground_truth'] (which stays the 'LABEL_BY_SELF_CONSISTENCY' placeholder)
+    so the real answer can't accidentally leak into the normal SRT reward. Same
+    numpy/dict defensive unwrapping as extract_ground_truth.
+    """
+    rm = row.get("reward_model", None)
+    if rm is None:
+        return None
+    if hasattr(rm, "item"):
+        try:
+            rm = rm.item()
+        except Exception:
+            pass
+    if isinstance(rm, dict):
+        return rm.get("solution_hidden_during_training", None)
+    return None
+
+
 def extract_prompt_text(prompt_field, tokenizer=None):
     """
     DAPO's parquet stores 'prompt' as a numpy array containing one dict:
@@ -168,6 +189,49 @@ def compute_rewards(answers: list, ground_truth: str, alpha: float):
         if ground_truth is not None
         else 0.0
     )
+    return rewards, majority_answer, agreement, avg_rollout_accuracy, majority_correct
+
+
+def compute_oracle_rewards(answers: list, ground_truth: str):
+    """
+    Ground-truth oracle reward (classic verifiable-reward RL): reward_i = 1.0 if
+    rollout i's answer matches the REAL ground truth, 0.0 otherwise -- no majority
+    vote, no entropy bonus, no self-consistency involved at all. This is the ceiling
+    baseline: what training looks like if the reward signal were perfect, instead of
+    the majority-vote proxy every other run in this project uses.
+
+    Still computes agreement/majority_answer purely as DIAGNOSTIC stats (never used
+    in the reward itself) so this run's output has the same shape as compute_rewards()
+    and can be logged/plotted the same way as every other baseline.
+
+    Returns: (rewards, majority_answer, agreement, avg_rollout_accuracy, majority_correct)
+    """
+    n = len(answers)
+    valid = [a for a in answers if a is not None]
+
+    rewards = []
+    true_correct = 0
+    for a in answers:
+        if a is None or ground_truth is None:
+            rewards.append(0.0)
+            continue
+        correct = repo_utils.score_against_ground_truth("\\boxed{" + a + "}", ground_truth)
+        rewards.append(1.0 if correct else 0.0)
+        if correct:
+            true_correct += 1
+    avg_rollout_accuracy = true_correct / n if n else 0.0
+
+    majority_answer, agreement, majority_correct = None, 0.0, 0.0
+    if valid:
+        counts = Counter(valid)
+        majority_answer, majority_count = counts.most_common(1)[0]
+        agreement = majority_count / len(valid)
+        majority_correct = (
+            repo_utils.score_against_ground_truth("\\boxed{" + majority_answer + "}", ground_truth)
+            if ground_truth is not None
+            else 0.0
+        )
+
     return rewards, majority_answer, agreement, avg_rollout_accuracy, majority_correct
 
 
@@ -394,7 +458,7 @@ def compute_sequence_logprobs(model, tokenizer, sequences: torch.Tensor, prompt_
 # One training step: generate -> reward -> advantage -> policy-gradient update
 # ---------------------------------------------------------------------------
 def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_rollouts,
-                   base_max_tokens, escalated_max_tokens, debug=False):
+                   base_max_tokens, escalated_max_tokens, debug=False, oracle=False):
     texts, gen_outputs, n_truncated = generate_rollouts(
         model, tokenizer, prompt, n_rollouts, base_max_tokens, escalated_max_tokens
     )
@@ -405,7 +469,10 @@ def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_ro
         for i, (t, a) in enumerate(zip(texts, answers)):
             print(f"  [debug] rollout {i}: extracted={a!r} | raw_tail={t[-150:]!r}")
 
-    rewards, majority_answer, agreement, avg_rollout_accuracy, _ = compute_rewards(answers, ground_truth, alpha)
+    if oracle:
+        rewards, majority_answer, agreement, avg_rollout_accuracy, _ = compute_oracle_rewards(answers, ground_truth)
+    else:
+        rewards, majority_answer, agreement, avg_rollout_accuracy, _ = compute_rewards(answers, ground_truth, alpha)
     train_acc_is_meaningful = not is_placeholder_label(ground_truth)
 
     advantages = rloo_advantages(torch.tensor(rewards, dtype=torch.float32, device=model.device))
@@ -513,6 +580,12 @@ def main():
     parser.add_argument("--test_parquet", type=str,
                          default=str(Path.home() / "data/srt_test_dataset/test.parquet"))
     parser.add_argument("--alpha", type=float, default=0.0)
+    parser.add_argument("--oracle", action="store_true",
+                         help="Ground-truth oracle baseline: reward = 1.0 if a rollout's "
+                              "answer matches the REAL answer (hidden at "
+                              "reward_model.solution_hidden_during_training), 0.0 "
+                              "otherwise -- no majority vote, no entropy bonus. --alpha "
+                              "is ignored when this is set.")
     parser.add_argument("--n_steps", type=int, default=20)
     parser.add_argument("--n_rollouts", type=int, default=4)
     parser.add_argument("--base_max_tokens", type=int, default=2048,
@@ -544,7 +617,8 @@ def main():
     print(f"Seed set to {args.seed} (matches Day-1 pilot convention: seed=42, "
           f"reproducible sampling).")
 
-    print(f"=== Lightweight RLOO training: alpha={args.alpha}, n_steps={args.n_steps} ===\n")
+    mode_str = "ORACLE (ground-truth reward, alpha ignored)" if args.oracle else f"alpha={args.alpha}"
+    print(f"=== Lightweight RLOO training: {mode_str}, n_steps={args.n_steps} ===\n")
 
     print("Running gradient invariance check first...")
     gradient_invariance_check(args.alpha)
@@ -637,12 +711,12 @@ def main():
     for step in range(args.n_steps):
         row = train_df.sample(1, random_state=args.seed + step).iloc[0]
         prompt = extract_prompt_text(row[prompt_col], tokenizer=tokenizer)
-        ground_truth = extract_ground_truth(row)
+        ground_truth = extract_oracle_ground_truth(row) if args.oracle else extract_ground_truth(row)
 
         step_stats = training_step(
             model, tokenizer, optimizer, prompt, ground_truth,
             args.alpha, args.n_rollouts, args.base_max_tokens, args.escalated_max_tokens,
-            debug=(step < args.debug_steps),
+            debug=(step < args.debug_steps), oracle=args.oracle,
         )
         acc_str = f"{step_stats['true_accuracy']:.3f}" if step_stats['true_accuracy'] is not None else "N/A (unlabeled)"
         print(f"step {step:4d} | loss={step_stats['loss']:.4f} "
