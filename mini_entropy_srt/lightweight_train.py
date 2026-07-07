@@ -600,6 +600,11 @@ def main():
                          help="Print raw generated text + extracted answers for the "
                               "first N training steps, to diagnose empty-parse issues.")
     parser.add_argument("--output", type=str, default="results/lightweight_run.json")
+    parser.add_argument("--checkpoint_path", type=str, default=None,
+                         help="Where to save/load model+optimizer state for crash resume. "
+                              "Defaults to --output with a .pt extension. If this file AND "
+                              "--output both already exist when the run starts, training "
+                              "resumes from the checkpointed step instead of starting over.")
     parser.add_argument("--seed", type=int, default=42,
                          help="Random seed for training-question sampling (reproducibility).")
     parser.add_argument("--eval_indices_path", type=str,
@@ -633,6 +638,27 @@ def main():
         tokenizer.pad_token_id = tokenizer.eos_token_id
     # SGD needs ~1x extra memory for its state vs AdamW's ~2x -- important on an 11GB GPU
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
+
+    # Crash-resume: if both the checkpoint and a prior results file exist, load the
+    # trained weights/optimizer state and continue from the next step instead of
+    # restarting from the frozen pretrained model. Without this, every OOM/crash lost
+    # all trained progress even though the LOGGED metrics were already safe via
+    # save_progress() -- this repeatedly cost real GPU-hours on the shared lab server.
+    checkpoint_path = Path(args.checkpoint_path) if args.checkpoint_path else Path(args.output).with_suffix(".pt")
+    out_path_for_resume_check = Path(args.output)
+    resuming = checkpoint_path.exists() and out_path_for_resume_check.exists()
+    start_step = 0
+    if resuming:
+        print(f"Found existing checkpoint at {checkpoint_path} -- resuming instead of starting over.")
+        checkpoint = torch.load(checkpoint_path, map_location="cuda")
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        start_step = checkpoint["step"] + 1
+        with open(out_path_for_resume_check) as f:
+            resumed_results = json.load(f)
+        pretrain_eval = resumed_results["pretrain_eval"]
+        history = resumed_results["history"]
+        print(f"Resuming at step {start_step} (already had {len(history)} completed steps logged).")
 
     print("Loading data...")
     train_df = pd.read_parquet(args.train_parquet)
@@ -680,21 +706,23 @@ def main():
     prompt_col = "prompt" if "prompt" in train_df.columns else train_df.columns[0]
     print(f"Train rows (after exclusion): {len(train_df)}, Test rows: {len(test_df)}")
 
-    # Genuine pre-training baseline: evaluated BEFORE any optimizer.step() has touched
-    # the weights, unlike the step-0 eval below (which already reflects one gradient
-    # update). This is the "frozen model" reference point -- compare zero_shot_accuracy
-    # vs test_accuracy here to see the raw generation-verification gap, and compare
-    # this test_accuracy against the run's LAST eval to see whether training actually
-    # helped or hurt.
-    print("Running pre-training baseline eval (frozen weights, before any training step)...")
-    pretrain_eval = evaluate(
-        model, tokenizer, test_df, args.n_eval_questions,
-        args.n_rollouts, args.base_max_tokens, args.escalated_max_tokens,
-    )
-    print(f"  [pretrain] zero_shot_acc={pretrain_eval['zero_shot_accuracy']:.3f} "
-          f"majority_acc={pretrain_eval['test_accuracy']:.3f} "
-          f"gap={pretrain_eval['agreement_gap']:.3f} "
-          f"entropy={pretrain_eval['mean_entropy']:.3f}\n")
+    if not resuming:
+        # Genuine pre-training baseline: evaluated BEFORE any optimizer.step() has touched
+        # the weights, unlike the step-0 eval below (which already reflects one gradient
+        # update). This is the "frozen model" reference point -- compare zero_shot_accuracy
+        # vs test_accuracy here to see the raw generation-verification gap, and compare
+        # this test_accuracy against the run's LAST eval to see whether training actually
+        # helped or hurt. Skipped on resume -- already computed and reloaded above.
+        print("Running pre-training baseline eval (frozen weights, before any training step)...")
+        pretrain_eval = evaluate(
+            model, tokenizer, test_df, args.n_eval_questions,
+            args.n_rollouts, args.base_max_tokens, args.escalated_max_tokens,
+        )
+        print(f"  [pretrain] zero_shot_acc={pretrain_eval['zero_shot_accuracy']:.3f} "
+              f"majority_acc={pretrain_eval['test_accuracy']:.3f} "
+              f"gap={pretrain_eval['agreement_gap']:.3f} "
+              f"entropy={pretrain_eval['mean_entropy']:.3f}\n")
+        history = []
 
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -707,8 +735,16 @@ def main():
         with open(out_path, "w") as f:
             json.dump({"args": vars(args), "pretrain_eval": pretrain_eval, "history": history}, f, indent=2)
 
-    history = []
-    for step in range(args.n_steps):
+    def save_checkpoint(step: int):
+        # Companion to save_progress(): that saves the LOGGED metrics, this saves the
+        # actual trained weights/optimizer state, so a crash can resume training itself
+        # instead of only preserving the numbers from steps already completed.
+        torch.save(
+            {"model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict(), "step": step},
+            checkpoint_path,
+        )
+
+    for step in range(start_step, args.n_steps):
         row = train_df.sample(1, random_state=args.seed + step).iloc[0]
         prompt = extract_prompt_text(row[prompt_col], tokenizer=tokenizer)
         ground_truth = extract_oracle_ground_truth(row) if args.oracle else extract_ground_truth(row)
@@ -739,8 +775,11 @@ def main():
 
         history.append(record)
         save_progress()
+        save_checkpoint(step)
 
     print(f"\nSaved results to {out_path}")
+    print(f"Training complete -- {checkpoint_path} can be deleted, or left in place "
+          f"(a future run with the same --output would otherwise treat it as a resume point).")
 
 
 if __name__ == "__main__":
