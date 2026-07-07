@@ -611,6 +611,14 @@ def main():
                          default=str(Path.home() / "RL_Project/mini_entropy_srt/data/eval_indices.json"),
                          help="Path to Day-1's eval_indices.json; those rows are EXCLUDED from "
                               "training to avoid train/eval leakage.")
+    parser.add_argument("--final_eval_all", action="store_true",
+                         help="After training finishes, run ONE extra evaluation pass over "
+                              "ALL test rows (not just --n_eval_questions) on the final trained "
+                              "model. The during-training checks repeatedly sample the SAME "
+                              "fixed small subset (by design, for a fair before/after trend) -- "
+                              "this gives a separate, less sample-biased number for the final "
+                              "report headline, at the cost of extra time (proportional to the "
+                              "full test set instead of --n_eval_questions).")
     args = parser.parse_args()
 
     import random as _random
@@ -727,13 +735,20 @@ def main():
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
+    final_eval_all_result = None
+
     def save_progress():
         # Called after EVERY step, not just at the end -- a long run that crashes
         # (OOM, node preemption, etc.) partway through previously lost ALL completed
         # steps, since the only json.dump() call was after the full loop. Overwrites
         # the same file each time, so this is always the latest complete state.
         with open(out_path, "w") as f:
-            json.dump({"args": vars(args), "pretrain_eval": pretrain_eval, "history": history}, f, indent=2)
+            json.dump({
+                "args": vars(args),
+                "pretrain_eval": pretrain_eval,
+                "history": history,
+                "final_eval_all": final_eval_all_result,
+            }, f, indent=2)
 
     def save_checkpoint(step: int):
         # Companion to save_progress(): that saves the LOGGED metrics, this saves the
@@ -776,6 +791,21 @@ def main():
         history.append(record)
         save_progress()
         save_checkpoint(step)
+
+    if args.final_eval_all:
+        print(f"\nRunning final evaluation on all {len(test_df)} test rows "
+              f"(final trained model, separate from the fixed {args.n_eval_questions}-question "
+              f"trend checks during training)...")
+        final_eval_all_result = evaluate(
+            model, tokenizer, test_df, len(test_df),
+            args.n_rollouts, args.base_max_tokens, args.escalated_max_tokens,
+        )
+        print(f"  [final, all {len(test_df)} questions] "
+              f"zero_shot_acc={final_eval_all_result['zero_shot_accuracy']:.3f} "
+              f"majority_acc={final_eval_all_result['test_accuracy']:.3f} "
+              f"gap={final_eval_all_result['agreement_gap']:.3f} "
+              f"entropy={final_eval_all_result['mean_entropy']:.3f}")
+        save_progress()
 
     print(f"\nSaved results to {out_path}")
     print(f"Training complete -- {checkpoint_path} can be deleted, or left in place "
