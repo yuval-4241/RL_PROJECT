@@ -23,4 +23,5 @@ python -u lightweight_train.py \
     --alpha 0.5 --n_steps 300 --n_rollouts 8 \
     --eval_every 15 --n_eval_questions 20 \
     --train_parquet ~/data/dapo_unlabeled/train_curated.parquet \
-    --output results/day3_alpha0.5.json
+    --output results/day3_alpha0.5.json \
+    --final_eval_all
