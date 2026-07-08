@@ -1,0 +1,309 @@
+{
+  "args": {
+    "model_path": "Qwen/Qwen2.5-Math-1.5B",
+    "train_parquet": "mini_entropy_srt/data/dapo_unlabeled/train_curated.parquet",
+    "test_parquet": "mini_entropy_srt/data/srt_test_dataset/test.parquet",
+    "alpha": 0.0,
+    "oracle": false,
+    "n_steps": 300,
+    "n_rollouts": 8,
+    "base_max_tokens": 2048,
+    "escalated_max_tokens": 4096,
+    "lr": 1e-06,
+    "eval_every": 15,
+    "n_eval_questions": 20,
+    "debug_steps": 2,
+    "output": "mini_entropy_srt/results/lab_alpha0.0.json",
+    "checkpoint_path": null,
+    "seed": 42,
+    "eval_indices_path": "mini_entropy_srt/data/eval_indices.json",
+    "final_eval_all": true
+  },
+  "pretrain_eval": {
+    "test_accuracy": 0.3,
+    "agreement_gap": 0.011309523809523806,
+    "mean_entropy": 1.6755925626132337,
+    "zero_shot_accuracy": 0.05
+  },
+  "history": [
+    {
+      "step": 0,
+      "loss": -575.9227638244629,
+      "agreement": 0.375,
+      "true_accuracy": null,
+      "entropy": 1.6674619334292946,
+      "test_accuracy": 0.4,
+      "agreement_gap": -0.04940476190476191,
+      "mean_entropy": 1.578425379795383,
+      "zero_shot_accuracy": 0.2
+    },
+    {
+      "step": 1,
+      "loss": -11.316689491271973,
+      "agreement": 0.125,
+      "true_accuracy": null,
+      "entropy": 2.0794415416798357
+    },
+    {
+      "step": 2,
+      "loss": 182.09342765808105,
+      "agreement": 0.375,
+      "true_accuracy": null,
+      "entropy": 1.6674619334292946
+    },
+    {
+      "step": 3,
+      "loss": -24.882720947265625,
+      "agreement": 0.125,
+      "true_accuracy": null,
+      "entropy": 2.0794415416798357
+    },
+    {
+      "step": 4,
+      "loss": 16.398990631103516,
+      "agreement": 0.375,
+      "true_accuracy": null,
+      "entropy": 1.4941751382893083
+    },
+    {
+      "step": 5,
+      "loss": -74.28540658950806,
+      "agreement": 0.125,
+      "true_accuracy": null,
+      "entropy": 2.0794415416798357
+    },
+    {
+      "step": 6,
+      "loss": 295.53703117370605,
+      "agreement": 0.25,
+      "true_accuracy": null,
+      "entropy": 1.559581156259877
+    },
+    {
+      "step": 7,
+      "loss": -407.5073490142822,
+      "agreement": 0.375,
+      "true_accuracy": null,
+      "entropy": 1.2554823251787535
+    },
+    {
+      "step": 8,
+      "loss": -20.382218837738037,
+      "agreement": 0.625,
+      "true_accuracy": null,
+      "entropy": 1.073542846408523
+    },
+    {
+      "step": 9,
+      "loss": -133.7632875442505,
+      "agreement": 0.14285714285714285,
+      "true_accuracy": null,
+      "entropy": 1.9459101490553132
+    },
+    {
+      "step": 10,
+      "loss": 3.985170364379883,
+      "agreement": 0.625,
+      "true_accuracy": null,
+      "entropy": 1.073542846408523
+    },
+    {
+      "step": 11,
+      "loss": -725.4587993621826,
+      "agreement": 0.25,
+      "true_accuracy": null,
+      "entropy": 1.9061547465398494
+    },
+    {
+      "step": 12,
+      "loss": 95.48575401306152,
+      "agreement": 0.375,
+      "true_accuracy": null,
+      "entropy": 1.6674619334292946
+    },
+    {
+      "step": 13,
+      "loss": 140.06451225280762,
+      "agreement": 0.25,
+      "true_accuracy": null,
+      "entropy": 1.732867951399863
+    },
+    {
+      "step": 14,
+      "loss": 141.68691110610962,
+      "agreement": 0.125,
+      "true_accuracy": null,
+      "entropy": 2.0794415416798357
+    },
+    {
+      "step": 15,
+      "loss": 33.74880790710449,
+      "agreement": 0.25,
+      "true_accuracy": null,
+      "entropy": 1.9061547465398494,
+      "test_accuracy": 0.25,
+      "agreement_gap": 0.08303571428571428,
+      "mean_entropy": 1.6140874549220903,
+      "zero_shot_accuracy": 0.1
+    },
+    {
+      "step": 16,
+      "loss": 159.05142211914062,
+      "agreement": 0.5,
+      "true_accuracy": null,
+      "entropy": 1.3862943611198906
+    },
+    {
+      "step": 17,
+      "loss": -154.7493553161621,
+      "agreement": 0.25,
+      "true_accuracy": null,
+      "entropy": 1.732867951399863
+    },
+    {
+      "step": 18,
+      "loss": -1406.5076065063477,
+      "agreement": 0.125,
+      "true_accuracy": null,
+      "entropy": 2.0794415416798357
+    },
+    {
+      "step": 19,
+      "loss": 86.19139289855957,
+      "agreement": 0.625,
+      "true_accuracy": null,
+      "entropy": 1.073542846408523
+    },
+    {
+      "step": 20,
+      "loss": 257.40627670288086,
+      "agreement": 0.8571428571428571,
+      "true_accuracy": null,
+      "entropy": 0.410116318288409
+    },
+    {
+      "step": 21,
+      "loss": 144.7117862701416,
+      "agreement": 0.25,
+      "true_accuracy": null,
+      "entropy": 1.9061547465398494
+    },
+    {
+      "step": 22,
+      "loss": 181.23316097259521,
+      "agreement": 0.25,
+      "true_accuracy": null,
+      "entropy": 1.9061547465398494
+    },
+    {
+      "step": 23,
+      "loss": -283.15489864349365,
+      "agreement": 0.25,
+      "true_accuracy": null,
+      "entropy": 1.9061547465398494
+    },
+    {
+      "step": 24,
+      "loss": 724.3892135620117,
+      "agreement": 0.25,
+      "true_accuracy": null,
+      "entropy": 1.9061547465398494
+    },
+    {
+      "step": 25,
+      "loss": -139.63393020629883,
+      "agreement": 0.25,
+      "true_accuracy": null,
+      "entropy": 1.9061547465398494
+    },
+    {
+      "step": 26,
+      "loss": 474.9161796569824,
+      "agreement": 0.125,
+      "true_accuracy": null,
+      "entropy": 2.0794415416798357
+    },
+    {
+      "step": 27,
+      "loss": -82.81899762153625,
+      "agreement": 0.125,
+      "true_accuracy": null,
+      "entropy": 2.0794415416798357
+    },
+    {
+      "step": 28,
+      "loss": 122.9115104675293,
+      "agreement": 0.25,
+      "true_accuracy": null,
+      "entropy": 1.732867951399863
+    },
+    {
+      "step": 29,
+      "loss": 736.8126907348633,
+      "agreement": 0.75,
+      "true_accuracy": null,
+      "entropy": 0.7356219397587946
+    },
+    {
+      "step": 30,
+      "loss": 324.0248565673828,
+      "agreement": 0.25,
+      "true_accuracy": null,
+      "entropy": 1.9061547465398494,
+      "test_accuracy": 0.3,
+      "agreement_gap": -0.004464285714285715,
+      "mean_entropy": 1.6845883472066319,
+      "zero_shot_accuracy": 0.15
+    },
+    {
+      "step": 31,
+      "loss": 914.7114143371582,
+      "agreement": 0.14285714285714285,
+      "true_accuracy": null,
+      "entropy": 1.9459101490553132
+    },
+    {
+      "step": 32,
+      "loss": -22.862135887145996,
+      "agreement": 0.14285714285714285,
+      "true_accuracy": null,
+      "entropy": 1.9459101490553132
+    },
+    {
+      "step": 33,
+      "loss": 68.20047950744629,
+      "agreement": 0.125,
+      "true_accuracy": null,
+      "entropy": 2.0794415416798357
+    },
+    {
+      "step": 34,
+      "loss": 86.35233688354492,
+      "agreement": 0.375,
+      "true_accuracy": null,
+      "entropy": 1.2554823251787535
+    },
+    {
+      "step": 35,
+      "loss": 0.11214303970336914,
+      "agreement": 0.125,
+      "true_accuracy": null,
+      "entropy": 2.0794415416798357
+    },
+    {
+      "step": 36,
+      "loss": 111.07278823852539,
+      "agreement": 0.375,
+      "true_accuracy": null,
+      "entropy": 1.4941751382893083
+    },
+    {
+      "step": 37,
+      "loss": -805.1678619384766,
+      "agreement": 0.42857142857142855,
+      "true_accuracy": null,
+      "entropy": 1.4750763110546947
+    }
+  ],
+  "final_eval_all": null
+}
