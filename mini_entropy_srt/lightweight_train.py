@@ -297,9 +297,12 @@ def gradient_invariance_check(alpha: float):
 # Rollout generation (plain transformers .generate(), no vLLM)
 # ---------------------------------------------------------------------------
 def generate_rollouts(model, tokenizer, prompt: str, n_rollouts: int,
-                       base_max_tokens: int = 2048, escalated_max_tokens: int = 4096):
+                       base_max_tokens: int = 2048, escalated_max_tokens: int = 4096,
+                       batch_generation: bool = False):
     """
-    Generate n_rollouts completions, ONE AT A TIME (num_return_sequences=1 per call)
+    Generate n_rollouts completions.
+
+    Default (batch_generation=False): ONE AT A TIME (num_return_sequences=1 per call)
     rather than batching all n_rollouts into a single .generate() call. HF's .generate()
     runs a normal forward pass over the full prompt for its first ("prefill") step, and
     that forward pass ALSO unconditionally upcasts its logits to fp32 (same underlying
@@ -308,8 +311,17 @@ def generate_rollouts(model, tokenizer, prompt: str, n_rollouts: int,
     n_rollouts, which can OOM for long-enough prompts even though generation itself
     runs under torch.no_grad() (no backward buffers needed, but the forward-pass peak
     is still real). Processing one rollout at a time bounds that peak to a single
-    prompt's prefill, independent of n_rollouts -- same principle already applied to
-    the training forward/backward pass in training_step().
+    prompt's prefill, independent of n_rollouts -- needed on memory-constrained GPUs
+    (the original 11GB SLURM/lab-server cards this project was built against).
+
+    batch_generation=True: all n_rollouts in ONE .generate() call (num_return_sequences=
+    n_rollouts). Plain (non-batched) autoregressive generation never fully saturates a
+    modern GPU's compute -- each token depends on the previous one, so there's limited
+    parallelism within a single sequence. Batching multiple sequences together lets the
+    GPU process them in parallel instead, meaningfully faster wall-clock time -- but
+    reintroduces the prefill-memory-multiplies-by-n_rollouts risk above, so only safe
+    on GPUs with comfortable VRAM headroom (e.g. dedicated rented GPUs, not the original
+    11GB constrained cards this project fought OOMs on all session).
 
     Uses base_max_tokens by default; any rollout that gets cut off (no EOS token
     reached, i.e. truncated mid-generation) is automatically regenerated ONCE at
@@ -331,43 +343,80 @@ def generate_rollouts(model, tokenizer, prompt: str, n_rollouts: int,
     prompt_len = inputs["input_ids"].shape[1]
     eos_id = tokenizer.eos_token_id
 
-    all_outputs = []
-    for _ in range(n_rollouts):
+    if batch_generation:
         with torch.no_grad():
-            out = model.generate(
+            outputs = model.generate(
                 **inputs,
                 max_new_tokens=base_max_tokens,
                 do_sample=True,
                 temperature=1.0,
-                num_return_sequences=1,
+                num_return_sequences=n_rollouts,
                 pad_token_id=tokenizer.eos_token_id,
                 use_cache=True,
             )
-        all_outputs.append(out[0])
-        torch.cuda.empty_cache()
+        truncated_mask = [eos_id not in seq[prompt_len:].tolist() for seq in outputs]
+        n_truncated = sum(truncated_mask)
 
-    # Detect truncation: a rollout is truncated if it never produced the EOS token
-    # within the generated span (i.e. it used the full budget without stopping naturally).
-    truncated_mask = [eos_id not in seq[prompt_len:].tolist() for seq in all_outputs]
-    n_truncated = sum(truncated_mask)
-
-    if n_truncated > 0:
-        # Re-generate ONLY the truncated rollouts, one at a time, at the escalated budget
-        for i, was_truncated in enumerate(truncated_mask):
-            if not was_truncated:
-                continue
+        if n_truncated > 0:
             with torch.no_grad():
-                esc_out = model.generate(
+                escalated_outputs = model.generate(
                     **inputs,
                     max_new_tokens=escalated_max_tokens,
+                    do_sample=True,
+                    temperature=1.0,
+                    num_return_sequences=n_truncated,
+                    pad_token_id=tokenizer.eos_token_id,
+                    use_cache=True,
+                )
+            esc_iter = iter(escalated_outputs)
+            max_len = max(outputs.shape[1], escalated_outputs.shape[1])
+            padded = torch.full((outputs.shape[0], max_len), tokenizer.pad_token_id,
+                                 dtype=outputs.dtype, device=outputs.device)
+            padded[:, : outputs.shape[1]] = outputs
+            for i, was_truncated in enumerate(truncated_mask):
+                if was_truncated:
+                    esc_seq = next(esc_iter)
+                    padded[i, : esc_seq.shape[0]] = esc_seq
+            outputs = padded
+        all_outputs = list(outputs)
+    else:
+        all_outputs = []
+        for _ in range(n_rollouts):
+            with torch.no_grad():
+                out = model.generate(
+                    **inputs,
+                    max_new_tokens=base_max_tokens,
                     do_sample=True,
                     temperature=1.0,
                     num_return_sequences=1,
                     pad_token_id=tokenizer.eos_token_id,
                     use_cache=True,
                 )
-            all_outputs[i] = esc_out[0]
+            all_outputs.append(out[0])
             torch.cuda.empty_cache()
+
+        # Detect truncation: a rollout is truncated if it never produced the EOS token
+        # within the generated span (i.e. it used the full budget without stopping naturally).
+        truncated_mask = [eos_id not in seq[prompt_len:].tolist() for seq in all_outputs]
+        n_truncated = sum(truncated_mask)
+
+        if n_truncated > 0:
+            # Re-generate ONLY the truncated rollouts, one at a time, at the escalated budget
+            for i, was_truncated in enumerate(truncated_mask):
+                if not was_truncated:
+                    continue
+                with torch.no_grad():
+                    esc_out = model.generate(
+                        **inputs,
+                        max_new_tokens=escalated_max_tokens,
+                        do_sample=True,
+                        temperature=1.0,
+                        num_return_sequences=1,
+                        pad_token_id=tokenizer.eos_token_id,
+                        use_cache=True,
+                    )
+                all_outputs[i] = esc_out[0]
+                torch.cuda.empty_cache()
 
     if was_checkpointing:
         model.gradient_checkpointing_enable()  # restore for the training forward pass
@@ -458,9 +507,11 @@ def compute_sequence_logprobs(model, tokenizer, sequences: torch.Tensor, prompt_
 # One training step: generate -> reward -> advantage -> policy-gradient update
 # ---------------------------------------------------------------------------
 def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_rollouts,
-                   base_max_tokens, escalated_max_tokens, debug=False, oracle=False):
+                   base_max_tokens, escalated_max_tokens, debug=False, oracle=False,
+                   batch_generation=False):
     texts, gen_outputs, n_truncated = generate_rollouts(
-        model, tokenizer, prompt, n_rollouts, base_max_tokens, escalated_max_tokens
+        model, tokenizer, prompt, n_rollouts, base_max_tokens, escalated_max_tokens,
+        batch_generation=batch_generation,
     )
     answers = [repo_utils.extract_boxed_answer(t) for t in texts]
 
@@ -524,7 +575,8 @@ def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_ro
 # ---------------------------------------------------------------------------
 # Held-out evaluation
 # ---------------------------------------------------------------------------
-def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, base_max_tokens, escalated_max_tokens):
+def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, base_max_tokens, escalated_max_tokens,
+             batch_generation=False):
     """test_accuracy/agreement_gap use MAJORITY-VOTE correctness (majority_correct),
     matching Day 1/2's reward_hack_gap = agreement - majority_vote_accuracy exactly --
     NOT avg_rollout_accuracy (avg@k), which is a different, always-more-pessimistic
@@ -538,7 +590,8 @@ def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, base_max_t
     sample = test_df.sample(min(n_eval_questions, len(test_df)), random_state=42)
     for _, row in sample.iterrows():
         prompt = extract_prompt_text(row["prompt"], tokenizer=tokenizer)
-        texts, _, _ = generate_rollouts(model, tokenizer, prompt, n_rollouts, base_max_tokens, escalated_max_tokens)
+        texts, _, _ = generate_rollouts(model, tokenizer, prompt, n_rollouts, base_max_tokens, escalated_max_tokens,
+                                         batch_generation=batch_generation)
         answers = [repo_utils.extract_boxed_answer(t) for t in texts]
         ground_truth = extract_ground_truth(row)
         _, majority_answer, agreement, _, majority_correct = compute_rewards(
@@ -612,6 +665,15 @@ def main():
                               "this gives a separate, less sample-biased number for the final "
                               "report headline, at the cost of extra time (proportional to the "
                               "full test set instead of --n_eval_questions).")
+    parser.add_argument("--batch_generation", action="store_true",
+                         help="Generate all n_rollouts in one batched .generate() call "
+                              "instead of one at a time. Meaningfully faster (plain "
+                              "autoregressive generation rarely saturates a modern GPU's "
+                              "compute when run one sequence at a time), but reintroduces "
+                              "a prefill-memory-multiplies-by-n_rollouts risk -- only use "
+                              "on GPUs with comfortable VRAM headroom (e.g. a dedicated "
+                              "rented GPU), not the original 11GB constrained cards this "
+                              "project was built against.")
     args = parser.parse_args()
 
     import random as _random
@@ -750,6 +812,7 @@ def main():
             model, tokenizer, optimizer, prompt, ground_truth,
             args.alpha, args.n_rollouts, args.base_max_tokens, args.escalated_max_tokens,
             debug=(step < args.debug_steps), oracle=args.oracle,
+            batch_generation=args.batch_generation,
         )
         acc_str = f"{step_stats['true_accuracy']:.3f}" if step_stats['true_accuracy'] is not None else "N/A (unlabeled)"
         print(f"step {step:4d} | loss={step_stats['loss']:.4f} "
@@ -763,10 +826,10 @@ def main():
             eval_stats = evaluate(
                 model, tokenizer, test_df, args.n_eval_questions,
                 args.n_rollouts, args.base_max_tokens, args.escalated_max_tokens,
+                batch_generation=args.batch_generation,
             )
             record.update(eval_stats)
-            print(f"  [eval] zero_shot_acc={eval_stats['zero_shot_accuracy']:.3f} "
-                  f"majority_acc={eval_stats['test_accuracy']:.3f} "
+            print(f"  [eval] majority_acc={eval_stats['test_accuracy']:.3f} "
                   f"gap={eval_stats['agreement_gap']:.3f} "
                   f"entropy={eval_stats['mean_entropy']:.3f}")
 
@@ -781,9 +844,9 @@ def main():
         final_eval_all_result = evaluate(
             model, tokenizer, test_df, len(test_df),
             args.n_rollouts, args.base_max_tokens, args.escalated_max_tokens,
+            batch_generation=args.batch_generation,
         )
         print(f"  [final, all {len(test_df)} questions] "
-              f"zero_shot_acc={final_eval_all_result['zero_shot_accuracy']:.3f} "
               f"majority_acc={final_eval_all_result['test_accuracy']:.3f} "
               f"gap={final_eval_all_result['agreement_gap']:.3f} "
               f"entropy={final_eval_all_result['mean_entropy']:.3f}")
