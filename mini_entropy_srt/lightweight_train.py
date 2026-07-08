@@ -530,11 +530,11 @@ def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, base_max_t
     NOT avg_rollout_accuracy (avg@k), which is a different, always-more-pessimistic
     number the paper itself tracks as a separate plot (Fig 3 vs Fig 4).
 
-    zero_shot_accuracy: rollout 0 alone, scored on its own -- a valid single-shot sample
-    (same temperature/distribution as every other rollout, no extra generation needed),
-    used to compare against majority_vote accuracy (the generation-verification gap)."""
+    zero_shot_accuracy is no longer computed here -- already-saved runs (e.g.
+    alpha=0.5's completed 300-step result) have it for reference; not needed going
+    forward."""
     model.eval()
-    accs, gaps, ents, zero_shot_accs = [], [], [], []
+    accs, gaps, ents = [], [], []
     sample = test_df.sample(min(n_eval_questions, len(test_df)), random_state=42)
     for _, row in sample.iterrows():
         prompt = extract_prompt_text(row["prompt"], tokenizer=tokenizer)
@@ -543,11 +543,6 @@ def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, base_max_t
         ground_truth = extract_ground_truth(row)
         _, majority_answer, agreement, _, majority_correct = compute_rewards(
             answers, ground_truth, alpha=0.0
-        )
-        zero_shot_correct = (
-            repo_utils.score_against_ground_truth("\\boxed{" + answers[0] + "}", ground_truth)
-            if answers[0] is not None and ground_truth is not None
-            else 0.0
         )
         valid_answers = [a for a in answers if a is not None]
         entropy = 0.0
@@ -558,14 +553,12 @@ def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, base_max_t
         accs.append(majority_correct)
         gaps.append(agreement - majority_correct)
         ents.append(entropy)
-        zero_shot_accs.append(zero_shot_correct)
         torch.cuda.empty_cache()  # same fragmentation mitigation as training_step
     model.train()
     return {
         "test_accuracy": sum(accs) / len(accs) if accs else 0.0,
         "agreement_gap": sum(gaps) / len(gaps) if gaps else 0.0,
         "mean_entropy": sum(ents) / len(ents) if ents else 0.0,
-        "zero_shot_accuracy": sum(zero_shot_accs) / len(zero_shot_accs) if zero_shot_accs else 0.0,
     }
 
 
@@ -715,21 +708,10 @@ def main():
     print(f"Train rows (after exclusion): {len(train_df)}, Test rows: {len(test_df)}")
 
     if not resuming:
-        # Genuine pre-training baseline: evaluated BEFORE any optimizer.step() has touched
-        # the weights, unlike the step-0 eval below (which already reflects one gradient
-        # update). This is the "frozen model" reference point -- compare zero_shot_accuracy
-        # vs test_accuracy here to see the raw generation-verification gap, and compare
-        # this test_accuracy against the run's LAST eval to see whether training actually
-        # helped or hurt. Skipped on resume -- already computed and reloaded above.
-        print("Running pre-training baseline eval (frozen weights, before any training step)...")
-        pretrain_eval = evaluate(
-            model, tokenizer, test_df, args.n_eval_questions,
-            args.n_rollouts, args.base_max_tokens, args.escalated_max_tokens,
-        )
-        print(f"  [pretrain] zero_shot_acc={pretrain_eval['zero_shot_accuracy']:.3f} "
-              f"majority_acc={pretrain_eval['test_accuracy']:.3f} "
-              f"gap={pretrain_eval['agreement_gap']:.3f} "
-              f"entropy={pretrain_eval['mean_entropy']:.3f}\n")
+        # Pre-training baseline eval removed (was: evaluate() on the frozen model before
+        # any optimizer.step()). No longer computed -- the periodic during-training evals
+        # (step 0 onward) are kept for the trend curve, just no separate "before" snapshot.
+        pretrain_eval = None
         history = []
 
     out_path = Path(args.output)
