@@ -576,7 +576,7 @@ def training_step(model, tokenizer, optimizer, prompt, ground_truth, alpha, n_ro
 # Held-out evaluation
 # ---------------------------------------------------------------------------
 def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, base_max_tokens, escalated_max_tokens,
-             batch_generation=False):
+             batch_generation=False, save_details=False):
     """test_accuracy/agreement_gap use MAJORITY-VOTE correctness (majority_correct),
     matching Day 1/2's reward_hack_gap = agreement - majority_vote_accuracy exactly --
     NOT avg_rollout_accuracy (avg@k), which is a different, always-more-pessimistic
@@ -584,9 +584,17 @@ def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, base_max_t
 
     zero_shot_accuracy is no longer computed here -- already-saved runs (e.g.
     alpha=0.5's completed 300-step result) have it for reference; not needed going
-    forward."""
+    forward.
+
+    save_details: if True, also return a "details" list with each question's real
+    ground truth, all 8 extracted answers, the majority answer, and whether it was
+    correct -- e.g. for qualitative reward-hacking examples in a report. Off by
+    default (not saved for every mid-training checkpoint -- would make the results
+    file far larger for no benefit to the main accuracy/gap comparison); intended
+    for the one-time --final_eval_all pass only."""
     model.eval()
     accs, gaps, ents = [], [], []
+    details = [] if save_details else None
     sample = test_df.sample(min(n_eval_questions, len(test_df)), random_state=42)
     for _, row in sample.iterrows():
         prompt = extract_prompt_text(row["prompt"], tokenizer=tokenizer)
@@ -606,13 +614,24 @@ def evaluate(model, tokenizer, test_df, n_eval_questions, n_rollouts, base_max_t
         accs.append(majority_correct)
         gaps.append(agreement - majority_correct)
         ents.append(entropy)
+        if save_details:
+            details.append({
+                "ground_truth": ground_truth,
+                "answers": answers,
+                "majority_answer": majority_answer,
+                "agreement": agreement,
+                "majority_correct": bool(majority_correct),
+            })
         torch.cuda.empty_cache()  # same fragmentation mitigation as training_step
     model.train()
-    return {
+    result = {
         "test_accuracy": sum(accs) / len(accs) if accs else 0.0,
         "agreement_gap": sum(gaps) / len(gaps) if gaps else 0.0,
         "mean_entropy": sum(ents) / len(ents) if ents else 0.0,
     }
+    if save_details:
+        result["details"] = details
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -844,7 +863,7 @@ def main():
         final_eval_all_result = evaluate(
             model, tokenizer, test_df, len(test_df),
             args.n_rollouts, args.base_max_tokens, args.escalated_max_tokens,
-            batch_generation=args.batch_generation,
+            batch_generation=args.batch_generation, save_details=True,
         )
         print(f"  [final, all {len(test_df)} questions] "
               f"majority_acc={final_eval_all_result['test_accuracy']:.3f} "
