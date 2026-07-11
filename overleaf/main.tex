@@ -1,0 +1,750 @@
+\documentclass{article}
+
+
+% ============================================================================
+% NeurIPS 2026 style. Using [preprint] so real author names are shown
+% (not anonymized) and the footer reads "Preprint. Work in progress."
+% instead of the double-blind submission notice. Switch to [final] once
+% the course confirms a camera-ready-style render is wanted, or drop the
+% option entirely to see the anonymized double-blind version with line
+% numbers.
+% ============================================================================
+\usepackage[preprint]{neurips_2026}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{graphicx}
+
+% ---------------------------------------------------------------------------
+% Placeholder helpers: everything wrapped in \pending{...} is a stand-in for
+% content that depends on the 900-step training runs, which are still in
+% progress on the lab/rented GPU as of this draft. Search for "PENDING" to
+% find every spot that still needs real numbers before submission.
+% ---------------------------------------------------------------------------
+\newcommand{\pending}[1]{\textcolor{red!70!black}{\bf [PENDING: #1]}}
+\newcommand{\figplaceholder}[2]{%
+  \begin{center}
+    \fbox{\parbox{0.92\linewidth}{\centering\vspace{2.2cm}
+      \textcolor{red!70!black}{\bf Figure placeholder}\\[2pt]
+      \small #2
+      \vspace{2.2cm}}}
+  \end{center}
+  \captionof{figure}{#1}
+}
+\usepackage{caption}
+
+\title{Entropy-Regularized Rewards for Self-Rewarded Training: \\
+Delaying Reward Hacking in Majority-Vote RL for Mathematical Reasoning}
+
+% TODO: confirm affiliation / department wording and emails before submitting.
+\author{
+  Daniel Shavit \\
+  \texttt{TODO: Department, University} \\
+  \texttt{shavit.daniel.2@gmail.com} \\
+  \And
+  Yuval Zohar \\
+  \texttt{TODO: Department, University} \\
+  \texttt{TODO: email} \\
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Self-Rewarded Training (SRT) \citep{shafayat2025srt} trains large reasoning
+models on mathematical problem-solving without ground-truth labels, using
+majority-vote agreement across sampled rollouts as a proxy reward. SRT
+improves accuracy early in training, but the original paper shows that
+extended training causes the proxy reward to be gamed: the model learns to
+maximize self-agreement without becoming more correct, and performance
+collapses. We propose adding a per-rollout entropy (surprisal) bonus to the
+SRT reward -- a classical exploration-preserving regularizer from
+policy-gradient RL \citep{williams1991function,mnih2016a3c,haarnoja2018sac} --
+to test whether it delays or reduces this collapse. We implement a
+lightweight, dependency-minimal replication of SRT's RLOO training loop on
+Qwen2.5-Math-1.5B over the DAPO dataset \citep{yu2025dapo}, and compare four
+reward conditions -- plain SRT ($\alpha{=}0$), two entropy-bonus strengths
+($\alpha{=}0.3$, $\alpha{=}0.5$), and a ground-truth oracle ceiling -- each
+trained for 900 steps with periodic held-out evaluation. \pending{final
+900-step accuracy/gap numbers and headline result sentence -- runs are still
+executing as of this draft}. A preliminary frozen-model pilot across three
+off-the-shelf models confirms that the agreement-accuracy gap SRT relies on
+is a real, measurable phenomenon prior to any training, motivating the
+intervention studied here.
+\end{abstract}
+
+% =============================================================================
+\section{Introduction}
+% =============================================================================
+
+Reinforcement learning has become the dominant recipe for turning a
+pretrained language model into a strong mathematical reasoner, but almost
+every successful recipe -- from RLHF to verifiable-reward RL for math --
+depends on a reward signal that requires either human-labeled preferences or
+a ground-truth answer key. Both are expensive to obtain at scale, which
+motivates \emph{label-free} RL: can a model improve at reasoning using only
+signals it can compute about its own outputs, with no external verifier?
+
+\citet{shafayat2025srt} study exactly this question with \textbf{Self-Rewarded
+Training (SRT)}. At every RL step, SRT samples several candidate solutions to
+the same problem from the \emph{current} policy, takes their majority-vote
+answer as a stand-in for ground truth, and rewards each rollout for agreeing
+with that majority. This builds directly on self-consistency decoding
+\citep{wang2022selfconsistency}, which showed that majority voting over
+multiple chain-of-thought samples is itself a strong test-time proxy for
+correctness. SRT turns that proxy into a training signal: no labels are
+needed because the model is, in effect, both student and teacher.
+
+This works, at first. \citeauthor{shafayat2025srt} report genuine accuracy
+gains with no ground-truth supervision at all. But they also identify the
+method's central failure mode, which motivates this project: with
+\textbf{prolonged training}, the policy can learn to maximize the
+self-consistency reward without becoming more \emph{correct} -- it collapses
+onto confidently repeating one answer per question, right or wrong, because
+that guarantees perfect agreement with itself. The self-consistency reward is
+maximized precisely as true accuracy stagnates or falls. This is a textbook
+instance of reward hacking (or Goodhart's law: a proxy stops being a good
+measure once it is directly optimized), and the original paper leaves
+\emph{fixing} it as an open problem rather than a solved one.
+
+\paragraph{Our contribution.} We propose a direct, mechanistically-motivated
+fix: augment SRT's reward with a small bonus proportional to how
+\emph{surprising} (rare) a rollout's answer is relative to the other sampled
+rollouts for that question. This is an application of entropy regularization
+-- a decades-old technique for preventing premature convergence in
+policy-gradient RL \citep{williams1991function}, popularized by A3C
+\citep{mnih2016a3c} and formalized as an explicit training objective by
+maximum-entropy RL methods such as Soft Actor-Critic
+\citep{haarnoja2018sac} -- applied specifically to SRT's self-consistency
+collapse, which the original paper does not attempt to address. We implement
+this as a lightweight, from-scratch RLOO \citep{kool2019buy,ahmadian2024back}
+training loop, add a ground-truth oracle condition as an upper-bound
+reference the original paper does not report, and run a controlled
+comparison across four reward conditions at 900 training steps each -- three
+times the budget of our initial 300-step feasibility run, chosen because
+reward hacking in the original paper's own experiments only becomes visible
+after substantial training.
+
+The rest of this report is organized as follows. Section~\ref{sec:background}
+reviews the RL background needed to follow SRT and our modification.
+Section~\ref{sec:contribution} states our reward function and hypotheses
+precisely. Section~\ref{sec:methodology} describes the experimental setup.
+Section~\ref{sec:results} reports results (with the main training comparison
+pending completion of the 900-step runs). Section~\ref{sec:discussion}
+discusses limitations and future work.
+
+
+% =============================================================================
+\section{Background}
+\label{sec:background}
+% =============================================================================
+
+\subsection{Policy-gradient RL and RLOO}
+
+We treat generating a solution as a sequence of token-level actions under a
+policy $\pi_\theta$ (the language model). Policy-gradient methods update
+$\theta$ in the direction of $\mathbb{E}[A \cdot \nabla_\theta \log
+\pi_\theta(\text{sequence})]$, where $A$ is an advantage estimate: how much
+better a sampled sequence's reward was than some baseline. \textbf{RLOO}
+(REINFORCE Leave-One-Out) \citep{kool2019buy,ahmadian2024back} is a
+critic-free advantage estimator well suited to this setting: given $k$
+rollouts $\{r_1,\dots,r_k\}$ for the same prompt with rewards
+$\{R_1,\dots,R_k\}$, the baseline for rollout $i$ is the mean reward of the
+\emph{other} $k-1$ rollouts,
+\[
+A_i = R_i - \frac{1}{k-1}\sum_{j\neq i} R_j ,
+\]
+avoiding the need to train a separate value network (unlike PPO) while
+remaining unbiased. SRT and our replication both use RLOO.
+
+\subsection{Self-consistency and Self-Rewarded Training}
+
+\citet{wang2022selfconsistency} observed that sampling multiple
+chain-of-thought solutions to the same problem and taking a majority vote
+over their final answers improves accuracy at inference time, without any
+additional training -- correct reasoning paths tend to agree with each
+other more than incorrect ones. \textbf{SRT} \citep{shafayat2025srt} turns
+this inference-time heuristic into a \emph{training} signal: at every RL
+step, it samples $k$ rollouts for a training prompt, computes their majority
+answer, and assigns reward $R_i = \mathbf{1}[a_i = \text{majority}(a_1,\dots,a_k)]$
+to each rollout $i$ -- 1 if it agrees with the crowd, 0 otherwise. Because the
+``teacher'' (the majority vote) is recomputed from the model's own,
+constantly-updating outputs at every step, SRT differs from other
+label-free methods that instead fix a majority-vote snapshot from a frozen
+model and train against it once (e.g.\ SFT-on-majority-vote, DPO, or
+ScPO-style preference optimization). This continuously-updating property is
+precisely what lets SRT track a moving target more closely than its
+fixed-snapshot cousins -- and, as discussed next, is also why it is
+uniquely vulnerable to drifting into confidently-wrong self-agreement.
+
+\subsection{Reward hacking via self-consistency collapse}
+
+Because $R_i$ only ever measures agreement with the model's own majority
+vote, and never checks the real answer, nothing in the objective
+distinguishes ``confidently correct'' from ``confidently wrong.'' If the
+policy's answer distribution for a given question narrows -- even for
+reasons unrelated to correctness -- the majority answer becomes easier to
+match, reward goes up, and the update reinforces that narrowing further. This
+is a feedback loop: overconfidence is self-reinforcing under a
+purely-agreement-based reward. \citeauthor{shafayat2025srt} document exactly
+this collapse empirically: after enough training, the self-consistency
+reward keeps climbing (near its ceiling) while true accuracy on held-out
+questions stagnates or drops. We track this with the same diagnostic used in
+the original paper's own analysis: the \textbf{agreement-accuracy gap},
+\[
+\text{gap} = \text{agreement} - \text{accuracy},
+\]
+where agreement is the fraction of a question's $k$ rollouts that match the
+majority answer (needs no ground truth), and accuracy is whether that
+majority answer is actually correct (needs ground truth, computed only for
+diagnostic/evaluation purposes, never fed into the SRT training reward). A
+gap near zero means the model's confidence tracks its correctness; a large,
+growing gap is the reward-hacking signature.
+
+\subsection{Entropy regularization in policy-gradient RL}
+
+Encouraging a policy to keep some residual randomness, rather than
+collapsing deterministically onto one action, is a long-standing fix for
+premature convergence in policy-gradient methods. \citet{williams1991function}
+is among the earliest to use an entropy-like regularization term in
+connectionist RL. \citet{mnih2016a3c}'s A3C algorithm adds the policy's
+entropy directly to the training objective, scaled by a coefficient, to
+discourage collapsing onto one action before exploration is complete --
+structurally the same shape as the bonus we add here.
+\citet{haarnoja2018sac}'s Soft Actor-Critic generalizes this into
+\emph{maximum-entropy RL}: optimizing for reward \emph{plus} entropy as a
+first-class part of the objective, rather than a minor add-on. Separately,
+\citet{pathak2017curiosity}'s curiosity-driven exploration rewards an agent
+for encountering low-probability (\emph{surprising}) outcomes, which is the
+more direct ancestor of the per-rollout \emph{surprisal} bonus we use (as
+opposed to a batch-level entropy term). None of this machinery is new to RL
+in general; what SRT's own paper does not do is apply it to its own
+self-consistency collapse, which is the gap this project targets.
+
+
+% =============================================================================
+\section{Contribution}
+\label{sec:contribution}
+% =============================================================================
+
+\subsection{Reward function}
+
+For a training question with $k$ rollout answers $a_1,\dots,a_k$ (some
+possibly unparseable / \texttt{None}), let $p(a)$ be the empirical fraction
+of \emph{valid} rollouts among the $k$ that produced answer $a$. We define
+the per-rollout reward
+\begin{equation}
+  R_i \;=\; \underbrace{\mathbf{1}[a_i = \text{majority}(a_1,\dots,a_k)]}_{\text{SRT's self-consistency reward}}
+  \;+\; \alpha \cdot \underbrace{\big(-\log p(a_i)\big)}_{\text{surprisal bonus}},
+  \label{eq:reward}
+\end{equation}
+with $\alpha \geq 0$ a fixed coefficient controlling the bonus strength.
+$\alpha = 0$ recovers plain SRT exactly. Rollouts with no parseable answer
+receive $R_i = 0$ and are excluded from the $p(a)$ estimate. Concretely: if 5
+of 8 rollouts answer ``84'', 2 answer ``91'', and 1 answers ``72'', then
+$p(84){=}0.625$, $p(91){=}0.25$, $p(72){=}0.125$, giving surprisal values of
+approximately $0.47$, $1.39$, and $2.08$ respectively -- so at $\alpha{=}0.5$
+the lone, rare ``72'' rollout earns almost as much reward ($1.04$) as the
+five majority ``84'' rollouts ($1.0$ each), instead of the $0$ it would get
+under plain SRT. This is the mechanism by which the bonus is meant to keep
+disagreement worthwhile enough that the policy does not fully collapse onto
+one answer before it has had the chance to discover the correct one.
+
+\subsection{Why this specifically targets SRT's failure mode}
+
+Under plain SRT ($\alpha{=}0$), any rollout that disagrees with the current
+majority gets exactly zero reward, regardless of whether it happens to be
+correct. As the policy's output distribution narrows over training, this
+structurally starves rare (but possibly correct) answers of any gradient
+signal, accelerating collapse. The surprisal term in
+Eq.~\ref{eq:reward} restores a reward for disagreement, scaled by how rare
+the disagreement currently is -- so the more the policy narrows, the larger
+the bonus for stepping outside the majority becomes, directly counteracting
+the runaway-confidence feedback loop described in
+Section~\ref{sec:background}. Because SRT's majority-vote target keeps
+evolving with the model (Section~\ref{sec:background}), it is more exposed to
+this loop than fixed-snapshot alternatives (SFT/DPO/ScPO on a single
+majority-vote pass); an exploration-preserving regularizer is a natural
+candidate fix for that specific dynamic. We are explicit that the entropy
+bonus \emph{mechanism} is not new (Section~\ref{sec:background}); the
+contribution is diagnosing that SRT's particular training dynamic is exactly
+the kind of premature-convergence failure this class of regularizer was
+designed for, and testing that empirically.
+
+\subsection{Oracle ceiling}
+
+We additionally implement a \textbf{ground-truth oracle} condition,
+$R_i = \mathbf{1}[a_i = \text{ground truth}]$, with no majority vote and no
+entropy bonus at all -- the classic verifiable-reward RL setup used when a
+real answer key \emph{is} available. The original SRT paper does not report
+this comparison. We include it as an upper-bound reference: it uses the same
+RLOO training loop and the same rollout budget as every other condition, so
+its accuracy curve shows what is achievable if the reward signal were
+perfect, letting us judge how much of the accuracy gap between SRT variants
+and ``ideal'' RL is attributable to the majority-vote proxy itself versus to
+reward hacking specifically.
+
+\subsection{Hypotheses}
+
+\begin{itemize}
+  \item \textbf{H1 (collapse under budget):} given enough training steps,
+  plain SRT ($\alpha{=}0$) will show a growing agreement-accuracy gap,
+  replicating the original paper's collapse finding at our (much smaller)
+  model scale.
+  \item \textbf{H2 (bonus delays collapse):} $\alpha > 0$ conditions will
+  show a smaller and/or later-growing gap than $\alpha{=}0$, at the possible
+  cost of slower or lower peak accuracy early in training (since reward is
+  partly diverted away from pure majority-matching).
+\end{itemize}
+Both hypotheses are evaluated in Section~\ref{sec:results} once the 900-step
+runs complete; our earlier 300-step feasibility run (Section~\ref{sec:methodology})
+did not run long enough to distinguish between the conditions on either axis,
+which is precisely why the training budget was extended for the results
+reported here.
+
+
+% =============================================================================
+\section{Methodology}
+\label{sec:methodology}
+% =============================================================================
+
+\subsection{Task, data, and model}
+
+We use the \textbf{DAPO} dataset curation \citep{yu2025dapo}, specifically
+the unlabeled variant \texttt{ftajwar/deduplicated\_dapo\_dataset} used by
+the original SRT codebase. During training, the visible ``ground truth''
+field is a placeholder (\texttt{LABEL\_BY\_SELF\_CONSISTENCY}) by design --
+no real answer is available to the training loop except in the oracle
+condition, where the real answer is read from a separate,
+deliberately-segregated field
+(\texttt{reward\_model.solution\_hidden\_during\_training}) that is never
+exposed to the non-oracle reward computation. Evaluation uses a disjoint,
+held-out 100-question test set (fixed \texttt{random\_state=42}); a nested,
+fixed 20-question subset of it is used for periodic during-training checks
+so that trend curves compare the same questions at every checkpoint, and the
+full 100 questions are used for a single, final evaluation pass at the end
+of each run. Training rows overlapping with the eval set are excluded to
+avoid leakage.
+
+We use \textbf{Qwen2.5-Math-1.5B} as the base policy, loaded via
+\texttt{transformers} in fp16. This is a much smaller model than typically
+used in SRT-style RL papers, chosen to fit the project's compute budget
+(a memory-constrained $\sim$11GB lab GPU, later supplemented with a rented
+GPU for the longer runs reported here).
+
+\subsection{Training loop}
+
+We implement SRT's algorithm directly (RLOO advantage, majority-vote /
+entropy-bonus / oracle rewards) in a single, dependency-minimal script rather
+than using the original paper's full \texttt{verl}+vLLM+FSDP training stack,
+which pulls in heavyweight distributed-training dependencies not needed at
+our scale. Answer extraction (\verb|\boxed{...}| parsing) and
+ground-truth equivalence checking reuse the original SRT repository's own
+\texttt{math\_verify}-based scorer directly (via a thin dynamic-import
+wrapper), rather than a reimplementation, so that e.g.\ \verb|\boxed{0.5}|
+and \verb|\boxed{1/2}| are scored as equal exactly as they would be in the
+original codebase, keeping our numbers comparable to it.
+
+Each training step: sample one training prompt; generate $k{=}8$ rollouts at
+temperature $1.0$ (rollouts that are truncated before an end-of-sequence
+token are automatically regenerated once at a longer token budget); extract
+and score answers; compute rewards per Eq.~\ref{eq:reward} (or the oracle
+reward); compute RLOO advantages; and take one SGD step (learning rate
+$10^{-6}$, momentum $0.9$, gradient norm clipped to $1.0$) using gradients
+accumulated one rollout at a time to fit the vocabulary-projection forward
+pass in memory. Before any real training run, we run an automated
+\textbf{gradient-invariance sanity check} that verifies the entropy bonus
+actually changes the computed RLOO advantages on a synthetic example
+(catching a ``zero-gradient bug'' class of implementation error before
+burning GPU time on a run that would silently reduce to plain SRT regardless
+of $\alpha$). Long runs checkpoint after every step and support
+crash-resume, which mattered in practice on a shared/rented GPU.
+
+\subsection{Experimental conditions}
+
+We compare four conditions, each trained for \textbf{900 steps}: $\alpha{=}0.0$
+(plain SRT, the paper's method), $\alpha{=}0.3$, $\alpha{=}0.5$ (our primary
+proposed configuration), and the ground-truth oracle. Held-out evaluation
+(20-question subset) runs every 15 steps to produce accuracy/gap/entropy
+trend curves; a single final evaluation over all 100 test questions is run
+at the end of each condition's 900 steps for the headline comparison number.
+900 steps was chosen as three times our initial 300-step feasibility run's
+budget: at 300 steps we observed no measurable gap growth in any condition
+(\pending{300-step numbers omitted from this report by design -- see
+Section~\ref{sec:results} for why}), consistent with the original paper's
+own observation that reward-hacking collapse is a phenomenon of
+\emph{extended} training, not early training. 900 steps is our best estimate,
+within the project's compute budget, of a horizon long enough to observe the
+onset of collapse if it occurs at this model scale.
+
+\subsection{Preliminary pilot: does the gap exist before any training?}
+
+Before committing compute to full RL training runs, we first ran a
+\textbf{frozen-model pilot}: no training at all, just the same
+majority-vote-vs.-ground-truth measurement applied to several off-the-shelf
+models' zero-shot behavior on a fixed 20-question subset, to confirm the
+agreement-accuracy gap this project studies is a real, measurable phenomenon
+worth building a training intervention around. Models tested: Qwen2.5-32B
+(lab GPU), Llama-4-Scout-17B (Groq API), and OpenAI's o4-mini. Results are
+reported in Section~\ref{sec:results}; this pilot is complete and is not
+affected by the still-running 900-step training experiments.
+
+\subsection{Metrics}
+
+For every evaluated question, agreement is the fraction of $k$ rollouts
+matching the majority answer; accuracy (majority-vote accuracy) is whether
+that majority answer matches the real answer; gap is agreement minus
+accuracy (Section~\ref{sec:background}); mean entropy is the Shannon entropy
+of the answer distribution across the $k$ rollouts. Loss is logged but,
+following the original paper's convention, is not used to compare
+conditions -- it reflects the policy-gradient objective's internal scale,
+not task performance.
+
+
+% =============================================================================
+\section{Experiments and Results}
+\label{sec:results}
+% =============================================================================
+
+\subsection{Preliminary pilot: frozen-model agreement-accuracy gap}
+
+Table~\ref{tab:pilot} reports the completed frozen-model pilot
+(Section~\ref{sec:methodology}): each model's zero-shot accuracy, 8-rollout
+majority-vote accuracy, and agreement, all on the same fixed evaluation
+subset, no training involved.
+
+\begin{table}[h]
+  \caption{Frozen-model pilot: majority-vote accuracy and agreement, no
+  training. Confirms the agreement-accuracy gap is present, and varies in
+  size, across off-the-shelf models before any RL intervention.}
+  \label{tab:pilot}
+  \centering
+  \begin{tabular}{lccc}
+    \toprule
+    Model & Majority-vote accuracy & Agreement & Gap \\
+    \midrule
+    o4-mini                        & 0.95 & 0.91 & $-0.04$ \\
+    Llama-4-Scout-17B-16E-Instruct & 0.40 & 0.68 & $+0.28$ \\
+    Qwen2.5-32B                    & 0.45 & 0.53 & $+0.08$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The gap varies substantially by model: o4-mini's agreement already tracks
+its (high) accuracy closely, while Llama-4-Scout shows a much larger gap --
+its rollouts agree with each other noticeably more often than they are
+actually correct, i.e.\ exactly the pattern SRT's reward would reinforce if
+this model were trained with it. This motivates studying the collapse
+dynamic directly through training, rather than assuming it is negligible at
+the model scale used in our main experiment.
+
+\subsection{Main training comparison (900 steps)}
+
+\pending{This subsection reports the core result of the report and is not
+yet complete. As of this draft, the $\alpha{=}0.0$ run is in progress on the
+lab server and the $\alpha{=}0.3$ run needs to be relaunched after an
+earlier interruption; $\alpha{=}0.5$ and the oracle condition are queued
+behind them. The table, figure, and paragraph below are structured to be
+filled in directly once all four 900-step runs finish their final
+100-question evaluation -- only the numbers/curves need to be dropped in,
+the surrounding analysis text should be revisited but the shape should not
+need to change.}
+
+\begin{table}[h]
+  \caption{Final (100-question) evaluation after 900 training steps, by
+  condition. \pending{fill in once runs complete}}
+  \label{tab:main-results}
+  \centering
+  \begin{tabular}{lccc}
+    \toprule
+    Condition & Test accuracy & Agreement & Gap \\
+    \midrule
+    $\alpha = 0.0$ (plain SRT)     & \pending{TBD} & \pending{TBD} & \pending{TBD} \\
+    $\alpha = 0.3$                  & \pending{TBD} & \pending{TBD} & \pending{TBD} \\
+    $\alpha = 0.5$ (main method)    & \pending{TBD} & \pending{TBD} & \pending{TBD} \\
+    Oracle (ceiling)                & \pending{TBD} & \pending{TBD} & \pending{TBD} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\figplaceholder{Test accuracy (left axis convention) and agreement-accuracy
+gap (right axis convention) vs.\ training step, for all four conditions,
+evaluated every 15 steps on the fixed 20-question subset.}{To be generated
+from \texttt{lab\_alpha0.0.json}, \texttt{lab\_alpha0.3.json},
+\texttt{lab\_alpha0.5.json}, and \texttt{lab\_oracle.json} once the 900-step
+runs finish -- one accuracy curve and one gap curve per condition, sharing a
+step axis.}
+
+\pending{Result narrative: state here whether H1 held (did $\alpha{=}0.0$'s
+gap grow over the 900 steps, unlike at 300 steps?) and whether H2 held (did
+$\alpha{=}0.3$/$0.5$ show a smaller or later-growing gap than $\alpha{=}0.0$,
+and at what cost, if any, to accuracy?). Compare all three non-oracle
+conditions' final accuracy against the oracle ceiling to quantify how much
+of the achievable accuracy is left on the table by the label-free reward
+proxies.}
+
+
+% =============================================================================
+\section{Discussion}
+\label{sec:discussion}
+% =============================================================================
+
+\subsection{Interpreting the result}
+\pending{Write this once Section~\ref{sec:results}'s table is filled in.
+Two shapes this could take: (a) if collapse appears in $\alpha{=}0.0$ by
+step 900 and is measurably smaller in $\alpha{=}0.3$/$0.5$, this section
+should discuss the accuracy/robustness trade-off and which $\alpha$ appears
+best-justified; (b) if no condition shows collapse even at 900 steps, this
+section should discuss what that implies about the training-budget scale at
+which SRT's failure mode emerges at this model size, and whether smaller
+models are simply slower to reach the confidence levels needed for the
+majority-vote reward to start being gamed.}
+
+\subsection{Limitations}
+
+Several limitations apply regardless of the final 900-step numbers.
+\textbf{Model scale}: Qwen2.5-Math-1.5B is far smaller than the models used
+in the original SRT paper and in most RL-for-math literature; conclusions
+here may not transfer to larger models, which could reach the confidence
+levels needed for collapse faster or slower than observed here.
+\textbf{Single seed per condition}: compute constraints meant each of the
+four 900-step conditions was run once, with no repeated seeds -- reported
+numbers have no error bars or significance testing, and single noisy
+checkpoints could be mistaken for genuine trend changes.
+\textbf{Rollout budget}: $k{=}8$ rollouts per question is smaller than some
+published SRT-style setups use, which weakens both the majority-vote signal
+itself and the resolution of the surprisal estimate $p(a)$.
+\textbf{Domain}: all training and evaluation is on DAPO math problems; we
+make no claim that the entropy bonus's effect (if any) generalizes to other
+verifiable-reward domains (code, logic puzzles) where SRT-style training has
+also been applied.
+\textbf{Fixed $\alpha$}: we test two discrete $\alpha$ values rather than a
+continuous sweep or a schedule (e.g.\ annealing $\alpha$ down over training),
+so we cannot rule out that some untested $\alpha$, or a time-varying
+schedule, performs meaningfully better than either value tested here.
+
+\subsection{Future work}
+
+Natural extensions include: repeating the 900-step comparison with multiple
+seeds to get error bars on the gap curves; sweeping $\alpha$ more finely (or
+annealing it) rather than comparing two fixed values; testing at a larger
+model scale closer to the original paper's; and testing whether an entropy
+bonus tuned on math transfers to other SRT application domains. If collapse
+is confirmed at 900 steps for $\alpha{=}0$, a natural next question is
+whether even longer training eventually causes collapse under the bonus too,
+just delayed -- i.e.\ whether the bonus changes the location of the failure
+mode or removes it.
+
+% =============================================================================
+% References
+% =============================================================================
+\begin{thebibliography}{99}
+
+\bibitem[Ahmadian et al.(2024)]{ahmadian2024back}
+Arash Ahmadian, Chris Cremer, Matthias Gall\'{e}, Marzieh Fadaee, Julia
+Kreutzer, Olivier Pietquin, Ahmet \"{U}st\"{u}n, and Sara Hooker.
+\newblock Back to basics: Revisiting REINFORCE-style optimization for
+learning from human feedback in LLMs.
+\newblock \emph{arXiv preprint arXiv:2402.14740}, 2024.
+
+\bibitem[Haarnoja et al.(2018)]{haarnoja2018sac}
+Tuomas Haarnoja, Aurick Zhou, Pieter Abbeel, and Sergey Levine.
+\newblock Soft actor-critic: Off-policy maximum entropy deep reinforcement
+learning with a stochastic actor.
+\newblock In \emph{Proceedings of the 35th International Conference on
+Machine Learning (ICML)}, 2018.
+
+\bibitem[Kool et al.(2019)]{kool2019buy}
+Wouter Kool, Herke van Hoof, and Max Welling.
+\newblock Buy 4 REINFORCE samples, get a baseline for free!
+\newblock In \emph{ICLR 2019 Workshop DeepRLStructPred}, 2019.
+
+\bibitem[Mnih et al.(2016)]{mnih2016a3c}
+Volodymyr Mnih, Adri\`{a} Puigdom\`{e}nech Badia, Mehdi Mirza, Alex Graves,
+Tim Harley, Timothy~P. Lillicrap, David Silver, and Koray Kavukcuoglu.
+\newblock Asynchronous methods for deep reinforcement learning.
+\newblock In \emph{Proceedings of the 33rd International Conference on
+Machine Learning (ICML)}, 2016.
+
+\bibitem[Pathak et al.(2017)]{pathak2017curiosity}
+Deepak Pathak, Pulkit Agrawal, Alexei~A. Efros, and Trevor Darrell.
+\newblock Curiosity-driven exploration by self-supervised prediction.
+\newblock In \emph{Proceedings of the 34th International Conference on
+Machine Learning (ICML)}, 2017.
+
+\bibitem[Shafayat et al.(2025)]{shafayat2025srt}
+Sheikh Shafayat et al.
+\newblock Can large reasoning models self-train?
+\newblock \emph{arXiv preprint arXiv:2505.21444}, 2025.
+
+\bibitem[Wang et al.(2022)]{wang2022selfconsistency}
+Xuezhi Wang, Jason Wei, Dale Schuurmans, Quoc Le, Ed~Chi, Sharan Narang,
+Aakanksha Chowdhery, and Denny Zhou.
+\newblock Self-consistency improves chain of thought reasoning in language
+models.
+\newblock \emph{arXiv preprint arXiv:2203.11171}, 2022.
+
+\bibitem[Williams and Peng(1991)]{williams1991function}
+Ronald~J. Williams and Jing Peng.
+\newblock Function optimization using connectionist reinforcement learning
+algorithms.
+\newblock \emph{Connection Science}, 3(3):241--268, 1991.
+
+\bibitem[Yu et al.(2025)]{yu2025dapo}
+Qiying Yu, Zheng Zhang, Ruofei Zhu, et al.
+\newblock DAPO: An open-source LLM reinforcement learning system at scale.
+\newblock \emph{arXiv preprint arXiv:2503.14476}, 2025.
+
+\end{thebibliography}
+
+
+% =============================================================================
+\newpage
+\appendix
+\section*{NeurIPS Paper Checklist}
+% =============================================================================
+
+\begin{enumerate}
+
+\item \textbf{Claims}\\
+    Question: Do the main claims made in the abstract and introduction
+    accurately reflect the paper's contributions and scope?\\
+    Answer: \answerTODO{}\\
+    Justification: \pending{Revisit once Section~\ref{sec:results} is
+    filled in -- the abstract currently states the result is pending, which
+    must be updated to match whatever H1/H2 outcome is found.}
+
+\item \textbf{Limitations}\\
+    Question: Does the paper discuss the limitations of the work performed
+    by the authors?\\
+    Answer: \answerYes{}\\
+    Justification: Section~\ref{sec:discussion} discusses model scale, single-seed
+    runs, rollout budget, domain restriction, and the fixed (non-swept)
+    $\alpha$ values tested.
+
+\item \textbf{Theory assumptions and proofs}\\
+    Question: For each theoretical result, does the paper provide the full
+    set of assumptions and a complete (and correct) proof?\\
+    Answer: \answerNA{}\\
+    Justification: The paper is empirical; it introduces no formal
+    theorems.
+
+\item \textbf{Experimental result reproducibility}\\
+    Question: Does the paper fully disclose all the information needed to
+    reproduce the main experimental results?\\
+    Answer: \answerYes{}\\
+    Justification: Section~\ref{sec:methodology} specifies the model,
+    dataset, reward formula (Eq.~\ref{eq:reward}), rollout count, learning
+    rate, optimizer, and evaluation protocol (fixed seeds, held-out
+    question subsets) needed to reproduce the setup.
+
+\item \textbf{Open access to data and code}\\
+    Question: Does the paper provide open access to the data and code, with
+    sufficient instructions to faithfully reproduce the main experimental
+    results?\\
+    Answer: \answerYes{}\\
+    Justification: Code and logged results are available at
+    \url{https://github.com/yuval-4241/RL_PROJECT}; the DAPO dataset used is
+    the public \texttt{ftajwar/deduplicated\_dapo\_dataset}.
+
+\item \textbf{Experimental setting/details}\\
+    Question: Does the paper specify all the training and test details
+    necessary to understand the results?\\
+    Answer: \answerYes{}\\
+    Justification: See Section~\ref{sec:methodology} (rollout count,
+    temperature, learning rate, optimizer, gradient clipping, evaluation
+    cadence, train/test split and leakage exclusion).
+
+\item \textbf{Experiment statistical significance}\\
+    Question: Does the paper report error bars or other appropriate
+    statistical-significance information?\\
+    Answer: \answerNo{}\\
+    Justification: Each of the four 900-step conditions was run with a
+    single seed due to compute/time constraints (Section~\ref{sec:discussion}); no
+    repeated-seed error bars are reported. This is flagged as a limitation.
+
+\item \textbf{Experiments compute resources}\\
+    Question: Does the paper provide sufficient information on the compute
+    resources needed to reproduce the experiments?\\
+    Answer: \answerYes{}\\
+    Justification: Training used a memory-constrained ($\sim$11GB) lab GPU
+    plus a rented GPU for the longer 900-step runs
+    (Section~\ref{sec:methodology}); \pending{insert exact GPU model and
+    total wall-clock/GPU-hours once the 900-step runs finish}.
+
+\item \textbf{Code of ethics}\\
+    Question: Does the research conform with the NeurIPS Code of Ethics?\\
+    Answer: \answerYes{}\\
+    Justification: The project trains on a public, deduplicated math
+    dataset and evaluates a reward-function modification; it poses no
+    identified conflicts with the Code of Ethics.
+
+\item \textbf{Broader impacts}\\
+    Question: Does the paper discuss both potential positive and negative
+    societal impacts?\\
+    Answer: \answerNo{}\\
+    Justification: This is a small-scale, class-project-level replication
+    and extension of an existing published method on a public math dataset;
+    we do not identify a direct path to negative applications distinct from
+    the original SRT paper's own discussion.
+
+\item \textbf{Safeguards}\\
+    Question: Does the paper describe safeguards for responsible release of
+    high-misuse-risk data or models?\\
+    Answer: \answerNA{}\\
+    Justification: No new model checkpoints or datasets are released
+    publicly beyond code and logged metrics; the base model (Qwen2.5-Math-1.5B)
+    is an existing open-weight release.
+
+\item \textbf{Licenses for existing assets}\\
+    Question: Are creators/owners of existing assets properly credited,
+    with licenses and terms of use respected?\\
+    Answer: \answerYes{}\\
+    Justification: The base model (Qwen2.5-Math-1.5B), the DAPO dataset
+    curation \citep{yu2025dapo}, and the original SRT codebase
+    \citep{shafayat2025srt} are all cited; all are used under their
+    respective public release terms.
+
+\item \textbf{New assets}\\
+    Question: Are new assets introduced in the paper well documented?\\
+    Answer: \answerNA{}\\
+    Justification: No new datasets or model checkpoints are introduced as
+    standalone released assets; the training code is documented in the
+    linked repository.
+
+\item \textbf{Crowdsourcing and research with human subjects}\\
+    Question: For crowdsourcing/human-subjects experiments, does the paper
+    include full instructions and compensation details?\\
+    Answer: \answerNA{}\\
+    Justification: No human subjects or crowdsourcing were involved.
+
+\item \textbf{IRB approvals}\\
+    Question: Does the paper describe IRB approval (or equivalent) for
+    human-subjects research?\\
+    Answer: \answerNA{}\\
+    Justification: No human-subjects research was conducted.
+
+\item \textbf{Declaration of LLM usage}\\
+    Question: Does the paper describe LLM usage if it is an important,
+    original, or non-standard component of the core methods?\\
+    Answer: \answerNo{}\\
+    Justification: LLMs (Qwen2.5-Math-1.5B, and separately Qwen2.5-32B /
+    Llama-4-Scout / o4-mini in the frozen-model pilot) are the
+    \emph{subject} of the research, not a tool used to produce the core
+    method or results; \pending{confirm and disclose here if any LLM
+    assistance was used for code scaffolding, writing, or analysis during
+    the project, per course/NeurIPS LLM-usage policy}.
+
+\end{enumerate}
+
+\end{document}
