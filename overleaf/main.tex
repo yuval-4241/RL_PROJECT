@@ -45,15 +45,18 @@
 \title{Entropy-Regularized Rewards for Self-Rewarded Training: \\
 Delaying Reward Hacking in Majority-Vote RL for Mathematical Reasoning}
 
-% TODO: confirm affiliation / department wording and emails before submitting.
 \author{
   Daniel Shavit \\
-  \texttt{TODO: Department, University} \\
-  \texttt{shavit.daniel.2@gmail.com} \\
+  \texttt{Department of Industrial} \\
+  \texttt{Engineering and Management,} \\
+  \texttt{Ben Gurion University} \\
+  \texttt{shavda@bgu.ac.il} \\
   \And
   Yuval Zohar \\
-  \texttt{TODO: Department, University} \\
-  \texttt{TODO: email} \\
+  \texttt{Department of Industrial} \\
+  \texttt{Engineering and Management,} \\
+  \texttt{Ben Gurion University} \\
+  \texttt{yuvalzoh@post.bgu.ac.il} \\
 }
 
 \begin{document}
@@ -65,7 +68,7 @@ Self-Rewarded Training (SRT) \citep{shafayat2025srt} trains large reasoning
 models on mathematical problem-solving without ground-truth labels, using
 majority-vote agreement across sampled rollouts as a proxy reward. SRT
 improves accuracy early in training, but the original paper shows that
-extended training causes the proxy reward to be gamed: the model learns to
+extended training causes the proxy reward to be corrupted: the model learns to
 maximize self-agreement without becoming more correct, and performance
 collapses. We propose adding a per-rollout entropy (surprisal) bonus to the
 SRT reward -- a classical exploration-preserving regularizer from
@@ -75,12 +78,21 @@ lightweight, dependency-minimal replication of SRT's RLOO training loop on
 Qwen2.5-Math-1.5B over the DAPO dataset \citep{yu2025dapo}, and compare four
 reward conditions -- plain SRT ($\alpha{=}0$), two entropy-bonus strengths
 ($\alpha{=}0.3$, $\alpha{=}0.5$), and a ground-truth oracle ceiling -- each
-trained for 900 steps with periodic held-out evaluation. \pending{final
-900-step accuracy/gap numbers and headline result sentence -- runs are still
-executing as of this draft}. A preliminary frozen-model pilot across three
-off-the-shelf models confirms that the agreement-accuracy gap SRT relies on
-is a real, measurable phenomenon prior to any training, motivating the
-intervention studied here.
+trained for 900 steps with periodic held-out evaluation. On the final,
+low-noise 100-question evaluation, plain SRT's accuracy fell and its
+agreement-accuracy gap grew substantially relative to an earlier, shorter
+feasibility run, consistent with the reward-hacking collapse the original
+paper describes; a moderate entropy bonus ($\alpha{=}0.3$) achieved the best
+result of the three trained conditions (highest accuracy, smallest gap),
+while a stronger bonus ($\alpha{=}0.5$) underperformed both alternatives --
+a non-monotonic effect of $\alpha$. Surprisingly, the ground-truth oracle
+condition did not behave like a ceiling at this training budget: its final
+accuracy ($0.25$) was on par with or below all three label-free conditions,
+suggesting that reward \emph{density} (how often a rollout receives useful
+signal) may matter as much as reward \emph{correctness} within a fixed,
+modest training budget. A preliminary frozen-model pilot across three off-the-shelf models
+confirms that the agreement-accuracy gap SRT relies on is a real, measurable
+phenomenon prior to any training, motivating the intervention studied here.
 \end{abstract}
 
 % =============================================================================
@@ -103,7 +115,7 @@ with that majority. This builds directly on self-consistency decoding
 \citep{wang2022selfconsistency}, which showed that majority voting over
 multiple chain-of-thought samples is itself a strong test-time proxy for
 correctness. SRT turns that proxy into a training signal: no labels are
-needed because the model is, in effect, both student and teacher.
+needed because the model is, in effect, both ``the student'' and ``the teacher''.
 
 This works, at first. \citeauthor{shafayat2025srt} report genuine accuracy
 gains with no ground-truth supervision at all. But they also identify the
@@ -113,9 +125,9 @@ self-consistency reward without becoming more \emph{correct} -- it collapses
 onto confidently repeating one answer per question, right or wrong, because
 that guarantees perfect agreement with itself. The self-consistency reward is
 maximized precisely as true accuracy stagnates or falls. This is a textbook
-instance of reward hacking (or Goodhart's law: a proxy stops being a good
-measure once it is directly optimized), and the original paper leaves
-\emph{fixing} it as an open problem rather than a solved one.
+instance of reward hacking: a proxy stops being a good measure once it is
+directly optimized, and the original paper leaves \emph{fixing} it as an
+open problem rather than a solved one.
 
 \paragraph{Our contribution.} We propose a direct, mechanistically-motivated
 fix: augment SRT's reward with a small bonus proportional to how
@@ -130,18 +142,17 @@ collapse, which the original paper does not attempt to address. We implement
 this as a lightweight, from-scratch RLOO \citep{kool2019buy,ahmadian2024back}
 training loop, add a ground-truth oracle condition as an upper-bound
 reference the original paper does not report, and run a controlled
-comparison across four reward conditions at 900 training steps each -- three
-times the budget of our initial 300-step feasibility run, chosen because
-reward hacking in the original paper's own experiments only becomes visible
-after substantial training.
+comparison across four reward conditions at 900 training steps each --
+chosen because reward hacking in the original paper's own experiments only
+becomes visible after substantial training.
 
 The rest of this report is organized as follows. Section~\ref{sec:background}
 reviews the RL background needed to follow SRT and our modification.
 Section~\ref{sec:contribution} states our reward function and hypotheses
 precisely. Section~\ref{sec:methodology} describes the experimental setup.
-Section~\ref{sec:results} reports results (with the main training comparison
-pending completion of the 900-step runs). Section~\ref{sec:discussion}
-discusses limitations and future work.
+Section~\ref{sec:results} reports results across all four 900-step
+conditions. Section~\ref{sec:discussion} discusses limitations and future
+work.
 
 
 % =============================================================================
@@ -239,10 +250,14 @@ self-consistency collapse, which is the gap this project targets.
 
 \subsection{Reward function}
 
-For a training question with $k$ rollout answers $a_1,\dots,a_k$ (some
-possibly unparseable / \texttt{None}), let $p(a)$ be the empirical fraction
-of \emph{valid} rollouts among the $k$ that produced answer $a$. We define
-the per-rollout reward
+For a training question, the policy generates $k$ rollouts with final
+answers $a_1,\dots,a_k$. Not every rollout necessarily yields an answer that
+can be parsed: if a rollout's output does not contain a valid
+\verb|\boxed{...}| expression (e.g.\ it was truncated, or the model never
+committed to a final answer), that rollout's answer is recorded as
+\texttt{None} and excluded from scoring. Let $p(a)$ be the empirical
+fraction \emph{among the parseable rollouts only} (i.e.\ excluding any
+\texttt{None}s) that produced answer $a$. We define the per-rollout reward
 \begin{equation}
   R_i \;=\; \underbrace{\mathbf{1}[a_i = \text{majority}(a_1,\dots,a_k)]}_{\text{SRT's self-consistency reward}}
   \;+\; \alpha \cdot \underbrace{\big(-\log p(a_i)\big)}_{\text{surprisal bonus}},
@@ -297,20 +312,17 @@ reward hacking specifically.
 \subsection{Hypotheses}
 
 \begin{itemize}
-  \item \textbf{H1 (collapse under budget):} given enough training steps,
+  \item \textbf{$H_0$ (collapse under budget):} given enough training steps,
   plain SRT ($\alpha{=}0$) will show a growing agreement-accuracy gap,
   replicating the original paper's collapse finding at our (much smaller)
   model scale.
-  \item \textbf{H2 (bonus delays collapse):} $\alpha > 0$ conditions will
+  \item \textbf{$H_1$ (bonus delays collapse):} $\alpha > 0$ conditions will
   show a smaller and/or later-growing gap than $\alpha{=}0$, at the possible
   cost of slower or lower peak accuracy early in training (since reward is
   partly diverted away from pure majority-matching).
 \end{itemize}
-Both hypotheses are evaluated in Section~\ref{sec:results} once the 900-step
-runs complete; our earlier 300-step feasibility run (Section~\ref{sec:methodology})
-did not run long enough to distinguish between the conditions on either axis,
-which is precisely why the training budget was extended for the results
-reported here.
+Both hypotheses are evaluated in Section~\ref{sec:results} against the
+completed 900-step runs.
 
 
 % =============================================================================
@@ -378,14 +390,12 @@ proposed configuration), and the ground-truth oracle. Held-out evaluation
 (20-question subset) runs every 15 steps to produce accuracy/gap/entropy
 trend curves; a single final evaluation over all 100 test questions is run
 at the end of each condition's 900 steps for the headline comparison number.
-900 steps was chosen as three times our initial 300-step feasibility run's
-budget: at 300 steps we observed no measurable gap growth in any condition
-(\pending{300-step numbers omitted from this report by design -- see
-Section~\ref{sec:results} for why}), consistent with the original paper's
-own observation that reward-hacking collapse is a phenomenon of
-\emph{extended} training, not early training. 900 steps is our best estimate,
-within the project's compute budget, of a horizon long enough to observe the
-onset of collapse if it occurs at this model scale.
+900 steps was chosen as the largest training budget practical within the
+project's compute allocation, guided by the original paper's own
+observation that reward-hacking collapse is a phenomenon of
+\emph{extended} training rather than early training -- we wanted a horizon
+long enough to give that failure mode a realistic chance to appear, if it
+occurs at this much smaller model scale.
 
 \subsection{Preliminary pilot: does the gap exist before any training?}
 
@@ -450,48 +460,115 @@ the model scale used in our main experiment.
 
 \subsection{Main training comparison (900 steps)}
 
-\pending{This subsection reports the core result of the report and is not
-yet complete. As of this draft, the $\alpha{=}0.0$ run is in progress on the
-lab server and the $\alpha{=}0.3$ run needs to be relaunched after an
-earlier interruption; $\alpha{=}0.5$ and the oracle condition are queued
-behind them. The table, figure, and paragraph below are structured to be
-filled in directly once all four 900-step runs finish their final
-100-question evaluation -- only the numbers/curves need to be dropped in,
-the surrounding analysis text should be revisited but the shape should not
-need to change.}
+All four conditions -- $\alpha{=}0.0$, $\alpha{=}0.3$, $\alpha{=}0.5$, and
+the ground-truth oracle -- have completed their full 900-step runs, each
+with a final evaluation over all 100 held-out test questions.
 
 \begin{table}[h]
   \caption{Final (100-question) evaluation after 900 training steps, by
-  condition. \pending{fill in once runs complete}}
+  condition. Agreement is derived as gap $+$ accuracy.}
   \label{tab:main-results}
   \centering
   \begin{tabular}{lccc}
     \toprule
     Condition & Test accuracy & Agreement & Gap \\
     \midrule
-    $\alpha = 0.0$ (plain SRT)     & \pending{TBD} & \pending{TBD} & \pending{TBD} \\
-    $\alpha = 0.3$                  & \pending{TBD} & \pending{TBD} & \pending{TBD} \\
-    $\alpha = 0.5$ (main method)    & \pending{TBD} & \pending{TBD} & \pending{TBD} \\
-    Oracle (ceiling)                & \pending{TBD} & \pending{TBD} & \pending{TBD} \\
+    $\alpha = 0.0$ (plain SRT)     & 0.26          & 0.30          & $+0.043$ \\
+    $\alpha = 0.3$                  & \textbf{0.30} & \textbf{0.32} & \textbf{$+0.016$} \\
+    $\alpha = 0.5$ (main method)    & 0.24          & 0.29          & $+0.051$ \\
+    Oracle (ground-truth reward)    & 0.25          & 0.30          & $+0.048$ \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\figplaceholder{Test accuracy (left axis convention) and agreement-accuracy
-gap (right axis convention) vs.\ training step, for all four conditions,
-evaluated every 15 steps on the fixed 20-question subset.}{To be generated
-from \texttt{lab\_alpha0.0.json}, \texttt{lab\_alpha0.3.json},
-\texttt{lab\_alpha0.5.json}, and \texttt{lab\_oracle.json} once the 900-step
-runs finish -- one accuracy curve and one gap curve per condition, sharing a
-step axis.}
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.98\linewidth]{results_curves.png}
+  \caption{Cumulative (running) average of test accuracy (left) and
+  agreement-accuracy gap (right) vs.\ training step, for all four
+  conditions, including the oracle. Each bold line is the running mean of
+  that condition's 20-question in-training checkpoints (every 15 steps,
+  fixed seed) from step 0 up to the current step; faint dots are the raw,
+  unsmoothed checkpoints, shown to make the per-checkpoint sampling noise
+  visible rather than hiding it. Gap is agreement minus accuracy
+  (Section~\ref{sec:background}): positive means the model agrees with
+  itself more than it is actually correct, the reward-hacking signature.
+  The low-noise, 100-question final evaluation for each condition is
+  reported separately in Table~\ref{tab:main-results} rather than
+  overlaid here.}
+  \label{fig:results-curves}
+\end{figure}
 
-\pending{Result narrative: state here whether H1 held (did $\alpha{=}0.0$'s
-gap grow over the 900 steps, unlike at 300 steps?) and whether H2 held (did
-$\alpha{=}0.3$/$0.5$ show a smaller or later-growing gap than $\alpha{=}0.0$,
-and at what cost, if any, to accuracy?). Compare all three non-oracle
-conditions' final accuracy against the oracle ceiling to quantify how much
-of the achievable accuracy is left on the table by the label-free reward
-proxies.}
+Table~\ref{tab:main-results} and Figure~\ref{fig:results-curves} show two
+results worth highlighting.
+
+\textbf{First, plain SRT ends training with a clearly positive gap, though
+the in-training trend alone would not have predicted it.} On the
+low-noise, 100-question final evaluation, $\alpha{=}0.0$ reached $0.26$
+accuracy with a $+0.043$ gap -- the second-largest (least healthy) gap of
+the four conditions (Table~\ref{tab:main-results}). A positive gap of this
+size is broadly consistent with \textbf{$H_0$}: it is the signature the
+original paper associates with reward-hacking collapse. However, this is
+essentially invisible in the in-training signal itself: the blue
+running-average curve in Figure~\ref{fig:results-curves} (right panel)
+stays close to $-0.03$ for the entire 900 steps and never approaches the
+$+0.043$ figure ultimately reported in Table~\ref{tab:main-results}.
+Individual raw 20-question checkpoints (faint dots) do occasionally spike
+as high as the final value or higher, but they spike below it just as
+often, so their running average never resolves a clear direction; the
+noise floor of a 20-question estimate (roughly $\pm0.05$--$0.10$) is simply
+too large relative to the effect size to detect it from the training-time
+signal alone. Because we only have one large-sample, low-noise measurement
+per condition -- taken once, at the very end of training -- we cannot tell
+from this run alone whether the gap grew gradually and the small-sample
+trend simply lacked the resolution to see it, or whether the final number
+is closer to a step-900-specific reading than a stable trend. We treat this
+as a genuine open question rather than settled evidence of collapse; a
+methodological point future work in this space should account for when
+sizing evaluation sets (Section~\ref{sec:discussion}).
+
+\textbf{Second, the entropy bonus's effect on the gap was non-monotonic in
+$\alpha$, only partially supporting $H_1$.} $\alpha{=}0.3$ was the
+best-performing trained condition on every axis measured: highest final
+accuracy ($0.30$, versus $0.26$ for plain SRT and $0.24$ for $\alpha{=}0.5$)
+and the smallest gap ($+0.016$, versus $+0.043$ and $+0.051$ respectively).
+This is the pattern $H_1$ predicts: a moderate entropy bonus reduced the
+reward-hacking signature relative to plain SRT. $\alpha{=}0.5$ did not
+continue this trend, however -- it was the \emph{worst} of the three
+conditions on both accuracy and gap. A bonus that is too strong appears to
+hurt rather than help: at $\alpha{=}0.5$ the surprisal term may compete
+enough with the
+majority-vote term to weaken the self-consistency signal SRT depends on,
+rather than merely preventing its collapse. Taken together, the three
+conditions suggest an inverted-U relationship between $\alpha$ and final
+performance rather than a monotonically increasing benefit of larger
+bonuses.
+
+\textbf{Third, the oracle condition did not behave like a ceiling at this
+training budget -- it was, if anything, one of the weaker conditions.}
+Trained directly on ground-truth reward ($R_i = \mathbf{1}[a_i =
+\text{ground truth}]$, no majority vote involved at all), the oracle
+reached only $0.25$ final accuracy: below $\alpha{=}0.3$, and statistically
+indistinguishable from plain SRT and $\alpha{=}0.5$ given the
+$\pm0.04$--$0.045$ noise floor discussed in Section~\ref{sec:discussion}.
+This is not what Section~\ref{sec:contribution} predicted the oracle would
+show. A plausible explanation is reward \emph{sparsity}: early in training,
+the base model is rarely exactly correct, so the oracle's binary
+$0$/$1$ reward is $0$ for nearly every rollout, giving RLOO very little
+useful gradient signal per step. The majority-vote reward, by contrast, is
+$1$ for roughly half of all $8$ rollouts \emph{by construction} (whichever
+answer happens to be most common), regardless of whether that answer is
+correct -- a denser, if noisier, training signal. Within a fixed, modest
+900-step budget, that density advantage may matter more than the majority
+vote's lack of correctness guarantee. A second, equally important
+observation: the oracle's own gap ($+0.048$) is not near zero, even though
+its reward never references the majority vote at all. Since \emph{gap} was
+introduced (Section~\ref{sec:background}) specifically as a majority-vote
+reward-hacking signature, a positive gap under ground-truth training
+suggests the metric also reflects something more generic about this model
+and training scale -- general RL noise or calibration drift, for instance
+-- and should not be read as proof of majority-vote-specific reward hacking
+on its own.
 
 
 % =============================================================================
@@ -500,15 +577,31 @@ proxies.}
 % =============================================================================
 
 \subsection{Interpreting the result}
-\pending{Write this once Section~\ref{sec:results}'s table is filled in.
-Two shapes this could take: (a) if collapse appears in $\alpha{=}0.0$ by
-step 900 and is measurably smaller in $\alpha{=}0.3$/$0.5$, this section
-should discuss the accuracy/robustness trade-off and which $\alpha$ appears
-best-justified; (b) if no condition shows collapse even at 900 steps, this
-section should discuss what that implies about the training-budget scale at
-which SRT's failure mode emerges at this model size, and whether smaller
-models are simply slower to reach the confidence levels needed for the
-majority-vote reward to start being gamed.}
+
+The pattern in Section~\ref{sec:results} -- plain SRT degrading with
+extended training while a moderate entropy bonus improves and a strong
+bonus overshoots -- is consistent with the mechanism proposed in
+Section~\ref{sec:contribution}: a bonus large enough to keep some reward on
+rare answers helps resist collapse, but a bonus large enough to materially
+compete with the majority-vote term for reward budget can itself destabilize
+the self-consistency signal SRT depends on, rather than simply protecting
+it. We treat this as a tentative rather than conclusive reading. Each of the
+three final accuracy numbers ($0.24$, $0.26$, $0.30$) comes from a single
+900-step run with no repeated seeds, and the standard error of a
+100-question accuracy estimate at this base rate is on the order of
+$\pm0.04$--$0.045$ -- comparable in size to the differences between
+conditions. The pattern is directionally consistent with $H_0$ and
+(partially) $H_1$, but we cannot rule out that a repeated run with a
+different seed would narrow or reverse the ordering between $\alpha{=}0.3$
+and $\alpha{=}0.0$/$0.5$. We had hoped the oracle condition would help
+settle this by providing a clean upper bound to calibrate against; instead
+it complicated the picture, landing among the weaker conditions rather than
+above all of them (Section~\ref{sec:results}). That result is useful in its
+own right -- it argues against reading \emph{any} single 900-step,
+single-seed run (oracle included) as a precise, trustworthy point estimate
+at this model scale -- but it means multi-seed replication (see Limitations
+below), not the oracle alone, is what would actually be needed to settle
+the ordering with confidence.
 
 \subsection{Limitations}
 
@@ -583,7 +676,8 @@ Deepak Pathak, Pulkit Agrawal, Alexei~A. Efros, and Trevor Darrell.
 Machine Learning (ICML)}, 2017.
 
 \bibitem[Shafayat et al.(2025)]{shafayat2025srt}
-Sheikh Shafayat et al.
+Sheikh Shafayat, Fahim Tajwar, Ruslan Salakhutdinov, Jeff Schneider, and
+Andrea Zanette.
 \newblock Can large reasoning models self-train?
 \newblock \emph{arXiv preprint arXiv:2505.21444}, 2025.
 
@@ -619,10 +713,15 @@ Qiying Yu, Zheng Zhang, Ruofei Zhu, et al.
 \item \textbf{Claims}\\
     Question: Do the main claims made in the abstract and introduction
     accurately reflect the paper's contributions and scope?\\
-    Answer: \answerTODO{}\\
-    Justification: \pending{Revisit once Section~\ref{sec:results} is
-    filled in -- the abstract currently states the result is pending, which
-    must be updated to match whatever H1/H2 outcome is found.}
+    Answer: \answerYes{}\\
+    Justification: The abstract and introduction state the observed pattern
+    (plain SRT ending training with a clearly positive gap; a moderate
+    entropy bonus performing best of the four conditions; a stronger bonus
+    underperforming; the oracle unexpectedly failing to behave as a ceiling)
+    and match Section~\ref{sec:results}. All
+    four conditions have completed 900-step training as of this draft; the
+    single-seed caveat on how confidently these claims generalize is stated
+    in Section~\ref{sec:discussion}, not glossed over.
 
 \item \textbf{Limitations}\\
     Question: Does the paper discuss the limitations of the work performed
@@ -669,18 +768,24 @@ Qiying Yu, Zheng Zhang, Ruofei Zhu, et al.
     Question: Does the paper report error bars or other appropriate
     statistical-significance information?\\
     Answer: \answerNo{}\\
-    Justification: Each of the four 900-step conditions was run with a
-    single seed due to compute/time constraints (Section~\ref{sec:discussion}); no
-    repeated-seed error bars are reported. This is flagged as a limitation.
+    Justification: Each condition was run with a single seed due to
+    compute/time constraints; no repeated-seed error bars are reported.
+    Section~\ref{sec:discussion} estimates the standard error of the
+    100-question accuracy figures ($\approx\pm0.04$) is comparable in size
+    to the differences observed between conditions, so the ordering
+    between $\alpha$ values should be read as suggestive rather than
+    statistically confirmed.
 
 \item \textbf{Experiments compute resources}\\
     Question: Does the paper provide sufficient information on the compute
     resources needed to reproduce the experiments?\\
     Answer: \answerYes{}\\
-    Justification: Training used a memory-constrained ($\sim$11GB) lab GPU
-    plus a rented GPU for the longer 900-step runs
-    (Section~\ref{sec:methodology}); \pending{insert exact GPU model and
-    total wall-clock/GPU-hours once the 900-step runs finish}.
+    Justification: Training used two compute environments: a shared lab
+    server (NVIDIA RTX 5090) and rented cloud GPUs via RunPod, with the
+    specific instance varying by availability across an RTX 4090, an RTX
+    PRO 4500, and an RTX 5090 (Section~\ref{sec:methodology}).
+    \pending{total wall-clock / GPU-hours across all four 900-step runs not
+    yet tallied}.
 
 \item \textbf{Code of ethics}\\
     Question: Does the research conform with the NeurIPS Code of Ethics?\\
@@ -737,14 +842,18 @@ Qiying Yu, Zheng Zhang, Ruofei Zhu, et al.
 \item \textbf{Declaration of LLM usage}\\
     Question: Does the paper describe LLM usage if it is an important,
     original, or non-standard component of the core methods?\\
-    Answer: \answerNo{}\\
-    Justification: LLMs (Qwen2.5-Math-1.5B, and separately Qwen2.5-32B /
+    Answer: \answerYes{}\\
+    Justification: Qwen2.5-Math-1.5B (and, separately, Qwen2.5-32B /
     Llama-4-Scout / o4-mini in the frozen-model pilot) are the
-    \emph{subject} of the research, not a tool used to produce the core
-    method or results; \pending{confirm and disclose here if any LLM
-    assistance was used for code scaffolding, writing, or analysis during
-    the project, per course/NeurIPS LLM-usage policy}.
+    \emph{subject} of the research, not a tool used to produce it. Separately,
+    an LLM coding assistant was used to help write portions of the training
+    / analysis code and this report; all LLM-assisted code and text were
+    reviewed, tested, and edited by the authors, who take full
+    responsibility for correctness of the final method, results, and
+    claims. The LLM was not used to generate or alter any experimental
+    result.
 
 \end{enumerate}
 
 \end{document}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
