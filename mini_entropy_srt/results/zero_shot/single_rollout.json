@@ -1,0 +1,5 @@
+{
+  "single_rollout_accuracy": 0.17,
+  "majority_of_8_accuracy": 0.26,
+  "n_questions": 100
+}

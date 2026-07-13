@@ -1,0 +1,1632 @@
+{
+  "args": {
+    "model_path": "Qwen/Qwen2.5-Math-1.5B",
+    "train_parquet": "data/dapo_unlabeled/train_curated.parquet",
+    "test_parquet": "data/srt_test_dataset/test.parquet",
+    "alpha": 0.0,
+    "oracle": false,
+    "n_steps": 0,
+    "n_rollouts": 8,
+    "base_max_tokens": 2048,
+    "escalated_max_tokens": 4096,
+    "lr": 1e-06,
+    "eval_every": 15,
+    "n_eval_questions": 20,
+    "debug_steps": 2,
+    "output": "results/zero_shot_full100.json",
+    "checkpoint_path": null,
+    "seed": 42,
+    "eval_indices_path": "data/eval_indices.json",
+    "final_eval_all": true,
+    "batch_generation": true
+  },
+  "pretrain_eval": null,
+  "history": [],
+  "final_eval_all": {
+    "test_accuracy": 0.26,
+    "agreement_gap": 0.0413095238095238,
+    "mean_entropy": 1.7019206923477699,
+    "details": [
+      {
+        "ground_truth": "9",
+        "answers": [
+          "9",
+          "3",
+          "9",
+          "7",
+          "3",
+          "3",
+          "32",
+          "9"
+        ],
+        "majority_answer": "9",
+        "agreement": 0.375,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "7.0",
+        "answers": [
+          "5",
+          "5",
+          "5",
+          "7",
+          "3",
+          "7",
+          "1",
+          "5"
+        ],
+        "majority_answer": "5",
+        "agreement": 0.5,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "11.0",
+        "answers": [
+          "29",
+          "12",
+          "11",
+          "10",
+          "7",
+          "11",
+          "11",
+          "11"
+        ],
+        "majority_answer": "11",
+        "agreement": 0.5,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "3.0",
+        "answers": [
+          "2^3 \\cdot 3^2 \\cdot 5^3",
+          null,
+          "1",
+          "",
+          "60",
+          "450",
+          "2^2 \\cdot 3^1 \\cdot 5^1",
+          null
+        ],
+        "majority_answer": "2^3 \\cdot 3^2 \\cdot 5^3",
+        "agreement": 0.16666666666666666,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "-2013",
+        "answers": [
+          null,
+          "94",
+          "-1007",
+          "11",
+          "2013",
+          "-35",
+          "59",
+          "838"
+        ],
+        "majority_answer": "94",
+        "agreement": 0.14285714285714285,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "45.0",
+        "answers": [
+          "45",
+          "71.57",
+          "45^\\circ",
+          "29.74",
+          "26.57",
+          "45^\\circ",
+          "45",
+          "30"
+        ],
+        "majority_answer": "45",
+        "agreement": 0.25,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "385",
+        "answers": [
+          "399999",
+          "14",
+          "4",
+          "y = -5x + 5",
+          "\\frac{5}{88}",
+          "25",
+          "6",
+          "500"
+        ],
+        "majority_answer": "399999",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "117",
+        "answers": [
+          "169",
+          "302",
+          "722",
+          "401",
+          "252",
+          "7",
+          "1:4",
+          "931"
+        ],
+        "majority_answer": "169",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "86400",
+        "answers": [
+          "6895",
+          "360 \\sqrt{2307}",
+          "720",
+          "74300",
+          "5625",
+          "90000",
+          "93721",
+          "16080"
+        ],
+        "majority_answer": "6895",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "321",
+        "answers": [
+          "506",
+          "79",
+          "357",
+          "10",
+          "831",
+          "9",
+          "875",
+          "1"
+        ],
+        "majority_answer": "506",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "10",
+        "answers": [
+          "0",
+          "3",
+          "5",
+          "3 + 4 + 5 = 12",
+          "\\sqrt{a} + 1",
+          "",
+          "6",
+          "5"
+        ],
+        "majority_answer": "5",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "90",
+        "answers": [
+          "0",
+          "88",
+          "95",
+          "98",
+          "97",
+          "81",
+          "90",
+          "126"
+        ],
+        "majority_answer": "0",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "15",
+        "answers": [
+          "15",
+          "15",
+          "15",
+          "15",
+          "15",
+          "15",
+          "15",
+          "15"
+        ],
+        "majority_answer": "15",
+        "agreement": 1.0,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "5",
+        "answers": [
+          "",
+          "5",
+          "7",
+          "5",
+          "15",
+          "12",
+          "\\frac{3 \\sqrt{6}}{2}",
+          "5"
+        ],
+        "majority_answer": "5",
+        "agreement": 0.375,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "1",
+        "answers": [
+          "[0,0]",
+          "2009",
+          "0",
+          "24",
+          "413",
+          "36",
+          "1",
+          "11"
+        ],
+        "majority_answer": "[0,0]",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "17",
+        "answers": [
+          "\\frac{\\sqrt{3}}{2}",
+          "",
+          "\\frac{\\sqrt{3}}{2}",
+          "3",
+          "2",
+          "3",
+          "7",
+          "15"
+        ],
+        "majority_answer": "\\frac{\\sqrt{3}}{2}",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "1991",
+        "answers": [
+          "2017",
+          "2835",
+          "1933",
+          "1109",
+          "1020245.123",
+          "3007",
+          "3007",
+          "1000"
+        ],
+        "majority_answer": "3007",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "211",
+        "answers": [
+          "10",
+          "(2, +\\infty)",
+          "10",
+          "20",
+          "14",
+          "18",
+          "\\frac{130}{161}",
+          "18"
+        ],
+        "majority_answer": "10",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "540",
+        "answers": [
+          "1125",
+          "792",
+          "540.0",
+          "30\\sqrt{397}",
+          "1560",
+          "720",
+          "540",
+          "5.079004836857997"
+        ],
+        "majority_answer": "1125",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "7986",
+        "answers": [
+          "19377",
+          "-2",
+          "11652",
+          "664",
+          "7880",
+          "1",
+          "3888",
+          "9901"
+        ],
+        "majority_answer": "19377",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "11",
+        "answers": [
+          "111",
+          "-104",
+          "8 \\text{ meters}",
+          "15",
+          "185",
+          "111",
+          "39",
+          "111"
+        ],
+        "majority_answer": "111",
+        "agreement": 0.375,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "503",
+        "answers": [
+          "999",
+          "1876",
+          "0",
+          "1001",
+          null,
+          "4950",
+          "1000",
+          "0"
+        ],
+        "majority_answer": "0",
+        "agreement": 0.2857142857142857,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "9.0",
+        "answers": [
+          "18240",
+          "0",
+          "9",
+          "80",
+          "42",
+          "\\frac{1}{2}",
+          "0317",
+          "96"
+        ],
+        "majority_answer": "18240",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "61",
+        "answers": [
+          "3 + \\sqrt{3}",
+          "3",
+          "61",
+          "2148",
+          "74",
+          "46",
+          "5",
+          "46"
+        ],
+        "majority_answer": "46",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "30",
+        "answers": [
+          "48",
+          "24\\sqrt{2}",
+          "48",
+          "48",
+          "48",
+          "48\\sqrt{2}",
+          "24",
+          "48"
+        ],
+        "majority_answer": "48",
+        "agreement": 0.625,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "62",
+        "answers": [
+          "7",
+          "228",
+          "0.377",
+          "186",
+          "46",
+          "67",
+          "67",
+          "0"
+        ],
+        "majority_answer": "67",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "403",
+        "answers": [
+          "202",
+          "403",
+          "404",
+          "799",
+          "404",
+          "403",
+          "4",
+          "802"
+        ],
+        "majority_answer": "403",
+        "agreement": 0.25,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "4.0",
+        "answers": [
+          "3",
+          "4",
+          "2",
+          "4280",
+          "5",
+          "3",
+          "8",
+          "5"
+        ],
+        "majority_answer": "3",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "7",
+        "answers": [
+          "11/11",
+          "7",
+          "7",
+          "13",
+          "6",
+          "7",
+          "17",
+          "3"
+        ],
+        "majority_answer": "7",
+        "agreement": 0.375,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "1807",
+        "answers": [
+          "6574",
+          "369",
+          "\\frac{1800}{7}",
+          "961069",
+          "505",
+          "\\frac{6525}{49}",
+          "1807",
+          "364"
+        ],
+        "majority_answer": "6574",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "402",
+        "answers": [
+          "",
+          "42",
+          "3628",
+          "564",
+          "10",
+          "776",
+          "835",
+          "9"
+        ],
+        "majority_answer": "",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "432",
+        "answers": [
+          "162",
+          "324",
+          "162",
+          "405",
+          "324",
+          "648",
+          "162",
+          "-1"
+        ],
+        "majority_answer": "162",
+        "agreement": 0.375,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "080",
+        "answers": [
+          "400 - 200\\sqrt{3}",
+          "20",
+          "100",
+          "80",
+          "\\frac{185\\sqrt{3}}{3}",
+          "100",
+          "120",
+          "140"
+        ],
+        "majority_answer": "100",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "5.0",
+        "answers": [
+          "7",
+          "0",
+          "8",
+          "8",
+          "408285",
+          "8",
+          "6",
+          "9"
+        ],
+        "majority_answer": "8",
+        "agreement": 0.375,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "116",
+        "answers": [
+          "22",
+          null,
+          "80",
+          "116",
+          "89",
+          "116",
+          "216",
+          "243"
+        ],
+        "majority_answer": "116",
+        "agreement": 0.2857142857142857,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "98",
+        "answers": [
+          "36",
+          "48",
+          "24",
+          "36",
+          "36",
+          "24",
+          "1",
+          "-\\frac{1}{3}"
+        ],
+        "majority_answer": "36",
+        "agreement": 0.375,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "32",
+        "answers": [
+          "13",
+          "32",
+          "128",
+          "64",
+          "32",
+          "128",
+          "24",
+          "32"
+        ],
+        "majority_answer": "32",
+        "agreement": 0.375,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "025",
+        "answers": [
+          "100",
+          "y = -4x - 2",
+          "100",
+          "25",
+          "25",
+          "e^{15}",
+          "25",
+          "25"
+        ],
+        "majority_answer": "25",
+        "agreement": 0.5,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "97",
+        "answers": [
+          "49",
+          "49",
+          null,
+          "43",
+          "48",
+          "49",
+          "49",
+          "49"
+        ],
+        "majority_answer": "49",
+        "agreement": 0.7142857142857143,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "23",
+        "answers": [
+          "17",
+          "23",
+          "47",
+          "39",
+          "121",
+          "405",
+          "13",
+          "5"
+        ],
+        "majority_answer": "17",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "1",
+        "answers": [
+          "1",
+          "2",
+          "1",
+          "1777",
+          "2",
+          "2",
+          "1",
+          "1"
+        ],
+        "majority_answer": "1",
+        "agreement": 0.5,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "49",
+        "answers": [
+          "49",
+          "499781",
+          "60",
+          "11",
+          "48",
+          "18",
+          "18",
+          "50"
+        ],
+        "majority_answer": "18",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "907",
+        "answers": [
+          "760",
+          "138",
+          "240",
+          "310",
+          "S_{2017}",
+          "009",
+          "9",
+          "081"
+        ],
+        "majority_answer": "760",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "240",
+        "answers": [
+          "2185",
+          "306",
+          "230",
+          "250",
+          "258",
+          "500",
+          "\\frac{1 + (-1)^n}{2}",
+          "170"
+        ],
+        "majority_answer": "2185",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "055",
+        "answers": [
+          "11",
+          "66",
+          "36",
+          "66",
+          "2024",
+          "3",
+          "47",
+          "1023"
+        ],
+        "majority_answer": "66",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "5",
+        "answers": [
+          "5",
+          "11",
+          "\\frac{1}{4}",
+          "5",
+          "5",
+          "5",
+          "11",
+          "5"
+        ],
+        "majority_answer": "5",
+        "agreement": 0.625,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "809",
+        "answers": [
+          "A: a > b > c",
+          "506",
+          "1620",
+          "405",
+          "1517",
+          "809",
+          "506",
+          "405"
+        ],
+        "majority_answer": "506",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "43",
+        "answers": [
+          "\\frac{3496}{1001}",
+          "41",
+          "\\frac{53}{2}",
+          "41",
+          "\\frac{603}{2}",
+          "43",
+          "33.3",
+          null
+        ],
+        "majority_answer": "41",
+        "agreement": 0.2857142857142857,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "1024",
+        "answers": [
+          "11",
+          "11",
+          "11",
+          "4",
+          "5",
+          "22",
+          "11",
+          "\\frac{8}{15}"
+        ],
+        "majority_answer": "11",
+        "agreement": 0.5,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "-2",
+        "answers": [
+          "25",
+          "1",
+          "13",
+          "7.5",
+          "-2",
+          "1",
+          "2",
+          "6\\pi - 18"
+        ],
+        "majority_answer": "1",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "108",
+        "answers": [
+          "144",
+          "\\frac{3k^2 + 2}{k^2 + 1}",
+          null,
+          "99",
+          "200",
+          "160",
+          "128",
+          "480"
+        ],
+        "majority_answer": "144",
+        "agreement": 0.14285714285714285,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "8",
+        "answers": [
+          "5",
+          "5",
+          "6",
+          "5",
+          "14",
+          "",
+          "10",
+          "7"
+        ],
+        "majority_answer": "5",
+        "agreement": 0.375,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "13.0",
+        "answers": [
+          "13",
+          "13",
+          "25",
+          "199",
+          "34",
+          "17",
+          "13",
+          "52"
+        ],
+        "majority_answer": "13",
+        "agreement": 0.375,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "120",
+        "answers": [
+          "19",
+          "19",
+          "20",
+          "34",
+          "1",
+          "12",
+          "23",
+          "1729"
+        ],
+        "majority_answer": "19",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "6.0",
+        "answers": [
+          "5",
+          "5",
+          "1",
+          "45",
+          "10",
+          "10",
+          "6",
+          "333333333"
+        ],
+        "majority_answer": "5",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "47",
+        "answers": [
+          "13",
+          "\\frac{2500}{7}",
+          null,
+          "23",
+          "25",
+          "30",
+          "1513",
+          "13"
+        ],
+        "majority_answer": "13",
+        "agreement": 0.2857142857142857,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "4004",
+        "answers": [
+          "78162960",
+          "462",
+          "",
+          "5005",
+          null,
+          "1334",
+          "362880",
+          "4178246400"
+        ],
+        "majority_answer": "78162960",
+        "agreement": 0.14285714285714285,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "2",
+        "answers": [
+          "2",
+          "3",
+          "8",
+          "324",
+          "\\frac{24}{5}",
+          "5",
+          "1",
+          "2"
+        ],
+        "majority_answer": "2",
+        "agreement": 0.25,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "4",
+        "answers": [
+          "4",
+          "4",
+          "4",
+          "1",
+          "",
+          "4",
+          "0, 1, \\sqrt{3}",
+          "4"
+        ],
+        "majority_answer": "4",
+        "agreement": 0.625,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "9.0",
+        "answers": [
+          "9",
+          "9",
+          "9",
+          "9",
+          "9",
+          "9",
+          "9",
+          "10"
+        ],
+        "majority_answer": "9",
+        "agreement": 0.875,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "3",
+        "answers": [
+          "3",
+          "\\frac{2}{3}",
+          "\\frac{2}3",
+          "7",
+          "3",
+          "2",
+          "13",
+          "12"
+        ],
+        "majority_answer": "3",
+        "agreement": 0.25,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "58",
+        "answers": [
+          null,
+          "11",
+          "34",
+          "22",
+          "374",
+          "6",
+          "3",
+          "43"
+        ],
+        "majority_answer": "11",
+        "agreement": 0.14285714285714285,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "48",
+        "answers": [
+          "16\\sqrt{13}",
+          "64",
+          "8 \\, \\mathrm{meters}",
+          "32",
+          "92",
+          "128",
+          "112",
+          "70"
+        ],
+        "majority_answer": "16\\sqrt{13}",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "36.0",
+        "answers": [
+          "6",
+          "153",
+          "90",
+          "90",
+          "105",
+          "378",
+          "67",
+          "10"
+        ],
+        "majority_answer": "90",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "193",
+        "answers": [
+          "final_answer",
+          "193",
+          "1",
+          "193",
+          "3",
+          "9",
+          "193",
+          "19"
+        ],
+        "majority_answer": "193",
+        "agreement": 0.375,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "0",
+        "answers": [
+          "1024",
+          "2048",
+          "0",
+          "0",
+          "0",
+          "128",
+          "359747",
+          "0"
+        ],
+        "majority_answer": "0",
+        "agreement": 0.5,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "144.0",
+        "answers": [
+          "6",
+          "4095",
+          "7",
+          "233",
+          "4096",
+          "15",
+          "144",
+          "28"
+        ],
+        "majority_answer": "6",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "18",
+        "answers": [
+          "50",
+          "16",
+          "49",
+          "4",
+          "6",
+          "97",
+          "48",
+          "2301"
+        ],
+        "majority_answer": "50",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "82",
+        "answers": [
+          "6",
+          "-2",
+          "2",
+          "2",
+          "14",
+          "90",
+          "9",
+          "8"
+        ],
+        "majority_answer": "2",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "17700",
+        "answers": [
+          "17900",
+          "17850",
+          "27800",
+          "18000",
+          "18000",
+          "13200",
+          "\\text{No}",
+          "17,900"
+        ],
+        "majority_answer": "18000",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "82",
+        "answers": [
+          "252",
+          "2032",
+          "30",
+          "28",
+          "8500",
+          "555",
+          "490",
+          "82"
+        ],
+        "majority_answer": "252",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "546",
+        "answers": [
+          "2184",
+          "1296",
+          "4128",
+          "3 \\times 7 \\times 571",
+          "\\text{A, B, C}",
+          "564956",
+          "608",
+          "2184"
+        ],
+        "majority_answer": "2184",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "-1.0",
+        "answers": [
+          "\\frac{e^2(6 + e)}{3 + e}",
+          "3a - 2b",
+          "0",
+          "1",
+          "18x^2 \\ln(x)",
+          "2^{2022}",
+          "643",
+          "1"
+        ],
+        "majority_answer": "1",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "3",
+        "answers": [
+          "3",
+          "3",
+          "1",
+          "2",
+          "1",
+          "2",
+          "3",
+          "2"
+        ],
+        "majority_answer": "3",
+        "agreement": 0.375,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "27",
+        "answers": [
+          "27",
+          "27",
+          "27",
+          "27",
+          "20",
+          "27",
+          "27",
+          "27"
+        ],
+        "majority_answer": "27",
+        "agreement": 0.875,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "1234759680",
+        "answers": [
+          "1570824369",
+          "3274956180",
+          "123457890",
+          "1023457896",
+          "1023457869",
+          "12",
+          "3816547290",
+          "1023457896"
+        ],
+        "majority_answer": "1023457896",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "254",
+        "answers": [
+          "512",
+          "2",
+          "4623",
+          "48620",
+          "1024",
+          "486",
+          "4",
+          "2304"
+        ],
+        "majority_answer": "512",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "3",
+        "answers": [
+          "1",
+          "5",
+          "4",
+          "3",
+          "2",
+          "3",
+          "4",
+          "2"
+        ],
+        "majority_answer": "4",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "29",
+        "answers": [
+          "3",
+          "9",
+          "62",
+          "3",
+          "59",
+          "84",
+          "9",
+          "6"
+        ],
+        "majority_answer": "3",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "42",
+        "answers": [
+          "10",
+          "31",
+          "69",
+          "31",
+          "43",
+          "52",
+          "38",
+          "13"
+        ],
+        "majority_answer": "31",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "38",
+        "answers": [
+          "34",
+          "6",
+          "2 \\cos(3)",
+          "35",
+          null,
+          "26",
+          "13",
+          "19"
+        ],
+        "majority_answer": "34",
+        "agreement": 0.14285714285714285,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "48",
+        "answers": [
+          "60",
+          "30",
+          "276",
+          "75",
+          "57.13",
+          "33.75 \\text{ minutes}",
+          "36",
+          "60"
+        ],
+        "majority_answer": "60",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "1",
+        "answers": [
+          "1",
+          "1, 12, 28, 30, 80, 96",
+          "\\text{All perfect squares}",
+          "1",
+          "7, 8, 9",
+          "6",
+          "n \\text{ such that the number of divisors of } n \\text{ is a perfect square}",
+          "1, 6, 72"
+        ],
+        "majority_answer": "1",
+        "agreement": 0.25,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "409",
+        "answers": [
+          "5",
+          "107",
+          "129",
+          "8",
+          "149",
+          "341",
+          "27",
+          "152017"
+        ],
+        "majority_answer": "5",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "167",
+        "answers": [
+          "167",
+          "671",
+          "334",
+          "167",
+          "167",
+          "167",
+          "167",
+          "334"
+        ],
+        "majority_answer": "167",
+        "agreement": 0.625,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "33",
+        "answers": [
+          "41",
+          "9",
+          "7",
+          "153",
+          "33",
+          "50",
+          "189",
+          "63"
+        ],
+        "majority_answer": "41",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "2500",
+        "answers": [
+          "4950",
+          "3750",
+          "2550",
+          "4950",
+          "4950",
+          "99",
+          "4950",
+          "1650"
+        ],
+        "majority_answer": "4950",
+        "agreement": 0.5,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "237",
+        "answers": [
+          "34810",
+          "15",
+          "237",
+          "12",
+          "7",
+          "5",
+          "36862",
+          "2176"
+        ],
+        "majority_answer": "34810",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "293",
+        "answers": [
+          "7",
+          "227",
+          "91",
+          "\\frac{612}{1}",
+          "221",
+          "145",
+          "217",
+          null
+        ],
+        "majority_answer": "7",
+        "agreement": 0.14285714285714285,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "902",
+        "answers": [
+          "-\\frac{4}{3}",
+          "5.07\\%",
+          "925",
+          "2",
+          "26",
+          "2",
+          "1500",
+          "24300000"
+        ],
+        "majority_answer": "2",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "11",
+        "answers": [
+          "12",
+          "21",
+          "11",
+          "21",
+          "1",
+          "21",
+          "21",
+          "20"
+        ],
+        "majority_answer": "21",
+        "agreement": 0.5,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "49",
+        "answers": [
+          "325",
+          "16",
+          "47",
+          "705",
+          "\\frac{(p + 2)(p - 4)(p - 1)}{(p - 5)(p + 1)(\\frac{3 p^{2}+5 p+6}{3 p-1})}",
+          "55",
+          "1871",
+          "341"
+        ],
+        "majority_answer": "325",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "3",
+        "answers": [
+          "3",
+          "3",
+          "3",
+          "3",
+          "3",
+          "3",
+          "43",
+          "3"
+        ],
+        "majority_answer": "3",
+        "agreement": 0.875,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "18.0",
+        "answers": [
+          "18",
+          "18",
+          "3",
+          "38",
+          "23",
+          "46",
+          "4",
+          "18"
+        ],
+        "majority_answer": "18",
+        "agreement": 0.375,
+        "majority_correct": true
+      },
+      {
+        "ground_truth": "033",
+        "answers": [
+          "269",
+          "6.52 \\times 10^{23}",
+          "16",
+          "323",
+          null,
+          "9",
+          "134",
+          "125"
+        ],
+        "majority_answer": "269",
+        "agreement": 0.14285714285714285,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "1006",
+        "answers": [
+          "124",
+          "0",
+          "13",
+          "1",
+          "8",
+          "8",
+          "8",
+          "18"
+        ],
+        "majority_answer": "8",
+        "agreement": 0.375,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "77",
+        "answers": [
+          "8",
+          "55",
+          "2584",
+          "17",
+          "\\text{The firm will use more capital and less labor.}",
+          "43",
+          "121",
+          "\\frac{16}{7}"
+        ],
+        "majority_answer": "8",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "24",
+        "answers": [
+          "89",
+          "518",
+          "564",
+          "496",
+          "96",
+          "1439",
+          "470",
+          "1222"
+        ],
+        "majority_answer": "89",
+        "agreement": 0.125,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "21.0",
+        "answers": [
+          "135",
+          "7",
+          "7",
+          "9",
+          "\\left( \\begin{array}{cc}\n\\text{Median/Cevian/ Symmedian} & (5.171875, 1.3) \\\\\n\\text{Altitude} & (2.34375, 0) \\\\\n\\end{array} \\right)",
+          "51",
+          "21",
+          "16"
+        ],
+        "majority_answer": "7",
+        "agreement": 0.25,
+        "majority_correct": false
+      },
+      {
+        "ground_truth": "955",
+        "answers": [
+          null,
+          "955",
+          "\\text{No}",
+          "955",
+          "955",
+          "955",
+          "955",
+          "955"
+        ],
+        "majority_answer": "955",
+        "agreement": 0.8571428571428571,
+        "majority_correct": true
+      }
+    ]
+  }
+}
