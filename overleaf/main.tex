@@ -77,15 +77,15 @@ to test whether it delays or reduces this collapse. We implement a
 lightweight, dependency-minimal replication of SRT's RLOO training loop on
 Qwen2.5-Math-1.5B over the DAPO dataset \citep{yu2025dapo}, and compare four
 reward conditions -- plain SRT ($\alpha{=}0$), two entropy-bonus strengths
-($\alpha{=}0.3$, $\alpha{=}0.5$), and a ground-truth oracle ceiling -- each
+($\alpha{=}0.3$, $\alpha{=}0.5$), and a ground-truth ceiling condition -- each
 trained for 900 steps with periodic held-out evaluation. On the final,
-low-noise 100-question evaluation, plain SRT's accuracy fell and its
-agreement-accuracy gap grew substantially relative to an earlier, shorter
-feasibility run, consistent with the reward-hacking collapse the original
-paper describes; a moderate entropy bonus ($\alpha{=}0.3$) achieved the best
-result of the three trained conditions (highest accuracy, smallest gap),
-while a stronger bonus ($\alpha{=}0.5$) underperformed both alternatives --
-a non-monotonic effect of $\alpha$. Surprisingly, the ground-truth oracle
+low-noise 100-question evaluation, plain SRT finished training with a
+clearly positive agreement-accuracy gap ($+0.043$), the reward-hacking
+signature the original paper describes; a moderate entropy bonus
+($\alpha{=}0.3$) achieved the best result of the three trained conditions
+(highest accuracy, smallest gap), while a stronger bonus ($\alpha{=}0.5$)
+underperformed both alternatives -- a non-monotonic effect of $\alpha$.
+Surprisingly, the ground-truth
 condition did not behave like a ceiling at this training budget: its final
 accuracy ($0.25$) was on par with or below all three label-free conditions,
 suggesting that reward \emph{density} (how often a rollout receives useful
@@ -140,7 +140,7 @@ maximum-entropy RL methods such as Soft Actor-Critic
 \citep{haarnoja2018sac} -- applied specifically to SRT's self-consistency
 collapse, which the original paper does not attempt to address. We implement
 this as a lightweight, from-scratch RLOO \citep{kool2019buy,ahmadian2024back}
-training loop, add a ground-truth oracle condition as an upper-bound
+training loop, add a ground-truth condition as an upper-bound
 reference the original paper does not report, and run a controlled
 comparison across four reward conditions at 900 training steps each --
 chosen because reward hacking in the original paper's own experiments only
@@ -177,6 +177,20 @@ A_i = R_i - \frac{1}{k-1}\sum_{j\neq i} R_j ,
 \]
 avoiding the need to train a separate value network (unlike PPO) while
 remaining unbiased. SRT and our replication both use RLOO.
+
+\textbf{Why sample several rollouts instead of one.} With $k{=}1$, RLOO has
+no other rollouts to compare against and collapses to a single raw reward
+with no baseline: every sequence is reinforced or discouraged purely on the
+sign of its own reward, a high-variance signal that says nothing about
+whether the model could have done better on that same prompt. Sampling
+$k>1$ rollouts turns each one into a \emph{relative} comparison against its
+peers, which sharpens the gradient (a rollout is only reinforced if it beats
+the average of the others, not merely if it is ``good'' in isolation) and
+removes the need for a learned critic. Multiple rollouts per prompt are also
+a hard requirement for SRT specifically, independent of RLOO: the
+majority-vote reward is only definable when there is a crowd to agree or
+disagree with, so with $k{=}1$ there is no self-consistency signal to train
+on at all.
 
 \subsection{Self-consistency and Self-Rewarded Training}
 
@@ -296,9 +310,9 @@ contribution is diagnosing that SRT's particular training dynamic is exactly
 the kind of premature-convergence failure this class of regularizer was
 designed for, and testing that empirically.
 
-\subsection{Oracle ceiling}
+\subsection{Ground-truth ceiling}
 
-We additionally implement a \textbf{ground-truth oracle} condition,
+We additionally implement a \textbf{ground-truth} condition,
 $R_i = \mathbf{1}[a_i = \text{ground truth}]$, with no majority vote and no
 entropy bonus at all -- the classic verifiable-reward RL setup used when a
 real answer key \emph{is} available. The original SRT paper does not report
@@ -336,11 +350,11 @@ We use the \textbf{DAPO} dataset curation \citep{yu2025dapo}, specifically
 the unlabeled variant \texttt{ftajwar/deduplicated\_dapo\_dataset} used by
 the original SRT codebase. During training, the visible ``ground truth''
 field is a placeholder (\texttt{LABEL\_BY\_SELF\_CONSISTENCY}) by design --
-no real answer is available to the training loop except in the oracle
+no real answer is available to the training loop except in the ground-truth
 condition, where the real answer is read from a separate,
 deliberately-segregated field
 (\texttt{reward\_model.solution\_hidden\_during\_training}) that is never
-exposed to the non-oracle reward computation. Evaluation uses a disjoint,
+exposed to reward computation in the other conditions. Evaluation uses a disjoint,
 held-out 100-question test set (fixed \texttt{random\_state=42}); a nested,
 fixed 20-question subset of it is used for periodic during-training checks
 so that trend curves compare the same questions at every checkpoint, and the
@@ -357,7 +371,7 @@ GPU for the longer runs reported here).
 \subsection{Training loop}
 
 We implement SRT's algorithm directly (RLOO advantage, majority-vote /
-entropy-bonus / oracle rewards) in a single, dependency-minimal script rather
+entropy-bonus / ground-truth rewards) in a single, dependency-minimal script rather
 than using the original paper's full \texttt{verl}+vLLM+FSDP training stack,
 which pulls in heavyweight distributed-training dependencies not needed at
 our scale. Answer extraction (\verb|\boxed{...}| parsing) and
@@ -370,7 +384,7 @@ original codebase, keeping our numbers comparable to it.
 Each training step: sample one training prompt; generate $k{=}8$ rollouts at
 temperature $1.0$ (rollouts that are truncated before an end-of-sequence
 token are automatically regenerated once at a longer token budget); extract
-and score answers; compute rewards per Eq.~\ref{eq:reward} (or the oracle
+and score answers; compute rewards per Eq.~\ref{eq:reward} (or the ground-truth
 reward); compute RLOO advantages; and take one SGD step (learning rate
 $10^{-6}$, momentum $0.9$, gradient norm clipped to $1.0$) using gradients
 accumulated one rollout at a time to fit the vocabulary-projection forward
@@ -386,7 +400,7 @@ crash-resume, which mattered in practice on a shared/rented GPU.
 
 We compare four conditions, each trained for \textbf{900 steps}: $\alpha{=}0.0$
 (plain SRT, the paper's method), $\alpha{=}0.3$, $\alpha{=}0.5$ (our primary
-proposed configuration), and the ground-truth oracle. Held-out evaluation
+proposed configuration), and the ground-truth condition. Held-out evaluation
 (20-question subset) runs every 15 steps to produce accuracy/gap/entropy
 trend curves; a single final evaluation over all 100 test questions is run
 at the end of each condition's 900 steps for the headline comparison number.
@@ -461,7 +475,7 @@ the model scale used in our main experiment.
 \subsection{Main training comparison (900 steps)}
 
 All four conditions -- $\alpha{=}0.0$, $\alpha{=}0.3$, $\alpha{=}0.5$, and
-the ground-truth oracle -- have completed their full 900-step runs, each
+the ground-truth condition -- have completed their full 900-step runs, each
 with a final evaluation over all 100 held-out test questions.
 
 \begin{table}[h]
@@ -476,7 +490,7 @@ with a final evaluation over all 100 held-out test questions.
     $\alpha = 0.0$ (plain SRT)     & 0.26          & 0.30          & $+0.043$ \\
     $\alpha = 0.3$                  & \textbf{0.30} & \textbf{0.32} & \textbf{$+0.016$} \\
     $\alpha = 0.5$ (main method)    & 0.24          & 0.29          & $+0.051$ \\
-    Oracle (ground-truth reward)    & 0.25          & 0.30          & $+0.048$ \\
+    Ground truth (verifiable reward) & 0.25          & 0.30          & $+0.048$ \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -486,7 +500,7 @@ with a final evaluation over all 100 held-out test questions.
   \includegraphics[width=0.98\linewidth]{results_curves.png}
   \caption{Cumulative (running) average of test accuracy (left) and
   agreement-accuracy gap (right) vs.\ training step, for all four
-  conditions, including the oracle. Each bold line is the running mean of
+  conditions, including the ground-truth condition. Each bold line is the running mean of
   that condition's 20-question in-training checkpoints (every 15 steps,
   fixed seed) from step 0 up to the current step; faint dots are the raw,
   unsmoothed checkpoints, shown to make the per-checkpoint sampling noise
@@ -544,16 +558,16 @@ conditions suggest an inverted-U relationship between $\alpha$ and final
 performance rather than a monotonically increasing benefit of larger
 bonuses.
 
-\textbf{Third, the oracle condition did not behave like a ceiling at this
+\textbf{Third, the ground-truth condition did not behave like a ceiling at this
 training budget -- it was, if anything, one of the weaker conditions.}
 Trained directly on ground-truth reward ($R_i = \mathbf{1}[a_i =
-\text{ground truth}]$, no majority vote involved at all), the oracle
+\text{ground truth}]$, no majority vote involved at all), this condition
 reached only $0.25$ final accuracy: below $\alpha{=}0.3$, and statistically
 indistinguishable from plain SRT and $\alpha{=}0.5$ given the
 $\pm0.04$--$0.045$ noise floor discussed in Section~\ref{sec:discussion}.
-This is not what Section~\ref{sec:contribution} predicted the oracle would
-show. A plausible explanation is reward \emph{sparsity}: early in training,
-the base model is rarely exactly correct, so the oracle's binary
+This is not what Section~\ref{sec:contribution} predicted the ground-truth
+condition would show. A plausible explanation is reward \emph{sparsity}: early in training,
+the base model is rarely exactly correct, so this condition's binary
 $0$/$1$ reward is $0$ for nearly every rollout, giving RLOO very little
 useful gradient signal per step. The majority-vote reward, by contrast, is
 $1$ for roughly half of all $8$ rollouts \emph{by construction} (whichever
@@ -561,7 +575,7 @@ answer happens to be most common), regardless of whether that answer is
 correct -- a denser, if noisier, training signal. Within a fixed, modest
 900-step budget, that density advantage may matter more than the majority
 vote's lack of correctness guarantee. A second, equally important
-observation: the oracle's own gap ($+0.048$) is not near zero, even though
+observation: the ground-truth condition's own gap ($+0.048$) is not near zero, even though
 its reward never references the majority vote at all. Since \emph{gap} was
 introduced (Section~\ref{sec:background}) specifically as a majority-vote
 reward-hacking signature, a positive gap under ground-truth training
@@ -593,14 +607,14 @@ $\pm0.04$--$0.045$ -- comparable in size to the differences between
 conditions. The pattern is directionally consistent with $H_0$ and
 (partially) $H_1$, but we cannot rule out that a repeated run with a
 different seed would narrow or reverse the ordering between $\alpha{=}0.3$
-and $\alpha{=}0.0$/$0.5$. We had hoped the oracle condition would help
+and $\alpha{=}0.0$/$0.5$. We had hoped the ground-truth condition would help
 settle this by providing a clean upper bound to calibrate against; instead
 it complicated the picture, landing among the weaker conditions rather than
 above all of them (Section~\ref{sec:results}). That result is useful in its
 own right -- it argues against reading \emph{any} single 900-step,
-single-seed run (oracle included) as a precise, trustworthy point estimate
+single-seed run (ground truth included) as a precise, trustworthy point estimate
 at this model scale -- but it means multi-seed replication (see Limitations
-below), not the oracle alone, is what would actually be needed to settle
+below), not the ground-truth condition alone, is what would actually be needed to settle
 the ordering with confidence.
 
 \subsection{Limitations}
@@ -717,7 +731,7 @@ Qiying Yu, Zheng Zhang, Ruofei Zhu, et al.
     Justification: The abstract and introduction state the observed pattern
     (plain SRT ending training with a clearly positive gap; a moderate
     entropy bonus performing best of the four conditions; a stronger bonus
-    underperforming; the oracle unexpectedly failing to behave as a ceiling)
+    underperforming; the ground-truth condition unexpectedly failing to behave as a ceiling)
     and match Section~\ref{sec:results}. All
     four conditions have completed 900-step training as of this draft; the
     single-seed caveat on how confidently these claims generalize is stated
@@ -851,9 +865,8 @@ Qiying Yu, Zheng Zhang, Ruofei Zhu, et al.
     reviewed, tested, and edited by the authors, who take full
     responsibility for correctness of the final method, results, and
     claims. The LLM was not used to generate or alter any experimental
-    result.
+result.
 
 \end{enumerate}
 
 \end{document}
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 
