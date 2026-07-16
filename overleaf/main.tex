@@ -310,6 +310,46 @@ contribution is diagnosing that SRT's particular training dynamic is exactly
 the kind of premature-convergence failure this class of regularizer was
 designed for, and testing that empirically.
 
+\subsection{The $\alpha$ hyperparameter: a derivable bound, not a guess}
+\label{sec:alpha-bound}
+
+The strength of the bonus, $\alpha$, controls how much the model is allowed
+to value \emph{being different} over \emph{being in the majority}, and this
+turns out to have a sharp, derivable threshold rather than only being a
+tuning knob to sweep blindly. Among $k$ rollouts, the rarest a parseable
+answer can be is $p(a) = 1/k$ (a single rollout out of $k$ produced it), so
+the largest surprisal bonus any rollout can ever earn is
+$-\log(1/k) = \log k$. Because matching the majority is worth exactly $1.0$
+(Eq.~\ref{eq:reward}), a maximally rare, disagreeing rollout begins to
+out-earn a majority-matching rollout once $\alpha \log k > 1$, i.e.\ once
+\[
+\alpha \;>\; \alpha^{*} \;=\; \frac{1}{\log k}.
+\]
+For our $k{=}8$ rollout budget, $\log 8 \approx 2.079$, giving
+$\alpha^{*} \approx 0.481$. Below this threshold, agreeing with the majority
+is \emph{always} the higher-reward choice, even in the worst case where the
+disagreeing rollout is maximally rare; above it, a sufficiently rare
+disagreement can outscore agreement outright. Our two tested nonzero values
+sit on opposite sides of this boundary: $\alpha{=}0.3 < \alpha^{*}$, so the
+bonus can only ever partially offset -- never overturn -- the incentive to
+agree with the crowd, meaning it protects rare-but-plausible answers from
+being fully starved of reward without threatening the majority-vote signal
+itself. $\alpha{=}0.5 > \alpha^{*}$, so a lone, maximally rare rollout can
+occasionally out-earn the majority, meaning the bonus is strong enough to
+actively compete with -- not just cushion -- the self-consistency signal SRT
+is built on. This gives a mechanistic, before-the-fact explanation for what
+the surprisal bonus changes about what the model learns: below $\alpha^{*}$
+it mainly changes \emph{how harshly} disagreement is punished; above it, it
+can change \emph{which answer is worth producing at all}, since the
+optimal policy under the reward is no longer guaranteed to be the majority
+answer. Section~\ref{sec:results} reports the resulting non-monotonic
+pattern in final accuracy and gap, which this bound anticipates. We note
+this is a worst-case, single-rollout bound rather than an empirical estimate
+from our actual answer-frequency distributions -- most rollouts do not sit
+at the extreme $p(a){=}1/k$ tail, so the bound is a conservative one, derived
+to explain the observed pattern rather than predicted in advance of running
+the experiment.
+
 \subsection{Ground-truth ceiling}
 
 We additionally implement a \textbf{ground-truth} condition,
@@ -556,7 +596,11 @@ majority-vote term to weaken the self-consistency signal SRT depends on,
 rather than merely preventing its collapse. Taken together, the three
 conditions suggest an inverted-U relationship between $\alpha$ and final
 performance rather than a monotonically increasing benefit of larger
-bonuses.
+bonuses. This lines up with the $\alpha^{*} \approx 0.481$ bound derived in
+Section~\ref{sec:alpha-bound}: $\alpha{=}0.3$ sits below it (the bonus can
+only ever cushion the majority-vote signal), while $\alpha{=}0.5$ sits above
+it (the bonus can occasionally overturn it) -- a mechanistic account of why
+more bonus was not simply better.
 
 \textbf{Third, the ground-truth condition did not behave like a ceiling at this
 training budget -- it was, if anything, one of the weaker conditions.}
@@ -583,6 +627,44 @@ suggests the metric also reflects something more generic about this model
 and training scale -- general RL noise or calibration drift, for instance
 -- and should not be read as proof of majority-vote-specific reward hacking
 on its own.
+
+\subsection{Comparison against a training-free baseline}
+
+Section~\ref{sec:alpha-bound} explains \emph{why} $\alpha{=}0.3$ and
+$\alpha{=}0.5$ diverge; Figure~\ref{fig:alpha-baseline} asks a different
+question -- how much either trained condition actually bought over doing no
+training at all. We compare the two trained conditions against two
+reference points measured on the untrained base model before any gradient
+update: its zero-shot (single-sample) accuracy, and its 8-rollout
+majority-vote accuracy, both from the same fixed evaluation subset used for
+in-training checkpoints (Section~\ref{sec:methodology}).
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.55\linewidth]{alpha_baseline.png}
+  \caption{Untrained zero-shot and untrained majority-vote accuracy (gray /
+  light blue) versus final accuracy after 900 steps of training at
+  $\alpha{=}0.3$ and $\alpha{=}0.5$ (green / red). The untrained bars use the
+  fixed 20-question in-training subset; the trained bars use the full
+  100-question held-out set (Section~\ref{sec:methodology}), so the
+  comparison is directional rather than exact.}
+  \label{fig:alpha-baseline}
+\end{figure}
+
+Simply taking a majority vote over 8 untrained rollouts raises accuracy from
+$0.05$ (zero-shot) to $0.30$ -- consistent with
+\citet{wang2022selfconsistency}'s original finding that self-consistency
+voting is a strong accuracy booster on its own, with no training involved.
+After 900 steps of RL training, $\alpha{=}0.3$ reaches $0.30$ final accuracy
+-- matching, rather than clearly exceeding, what untrained majority voting
+already provided for free, while $\alpha{=}0.5$ falls below it at $0.24$.
+Because the untrained baseline is measured on a smaller question subset than
+the trained conditions (Section~\ref{sec:methodology}), this is a rough
+comparison, not a controlled one; still, it is a useful sanity check that at
+this model scale and training budget, neither trained condition clearly
+outperformed simply asking the untrained model to vote among its own
+rollouts -- a different angle on the same reward-density story as the
+ground-truth result above.
 
 
 % =============================================================================
